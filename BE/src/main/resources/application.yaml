@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: ShortLink
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
