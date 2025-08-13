@@ -1,4 +1,4 @@
-language: "ko-KR" 
+language: "ko-KR"
 early_access: false
 reviews:
   profile: "chill"
@@ -9,6 +9,8 @@ reviews:
   auto_review:
     enabled: true
     drafts: false
-    create_tests: false
+  finishing_touches:
+    unit_tests:
+      enabled: false
 chat:
   auto_reply: true
