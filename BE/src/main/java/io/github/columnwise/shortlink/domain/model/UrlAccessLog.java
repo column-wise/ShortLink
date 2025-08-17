@@ -1,4 +1,15 @@
 package io.github.columnwise.shortlink.domain.model;
 
-public record UrlAccessLog() {
+import lombok.Builder;
+
+import java.time.Instant;
+
+@Builder
+public record UrlAccessLog(
+        long id,
+        String code,
+        String ipAddress,
+        String userAgent,
+        Instant accessedAt
+) {
 }
