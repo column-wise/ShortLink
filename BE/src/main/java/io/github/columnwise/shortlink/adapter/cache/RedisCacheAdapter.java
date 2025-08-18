@@ -1,6 +1,7 @@
 package io.github.columnwise.shortlink.adapter.cache;
 
 import io.github.columnwise.shortlink.application.port.out.CachePort;
+import io.github.columnwise.shortlink.config.RedisProperties;
 import io.github.columnwise.shortlink.domain.model.ShortUrl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,16 +16,14 @@ import java.util.Optional;
 @Slf4j
 public class RedisCacheAdapter implements CachePort {
     
-    private static final String CACHE_KEY_PREFIX = "shorturl:";
-    private static final Duration DEFAULT_TTL = Duration.ofMinutes(30);
-    
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final RedisTemplate<String, ShortUrl> redisTemplate;
+    private final RedisProperties redisProperties;
     
     @Override
     public Optional<ShortUrl> findByCode(String code) {
         try {
             String key = getCacheKey(code);
-            ShortUrl cached = (ShortUrl) redisTemplate.opsForValue().get(key);
+            ShortUrl cached = redisTemplate.opsForValue().get(key);
             return Optional.ofNullable(cached);
         } catch (Exception e) {
             log.warn("Failed to get from cache for code: {}", code, e);
@@ -36,7 +35,7 @@ public class RedisCacheAdapter implements CachePort {
     public void save(ShortUrl shortUrl) {
         try {
             String key = getCacheKey(shortUrl.code());
-            redisTemplate.opsForValue().set(key, shortUrl, DEFAULT_TTL);
+            redisTemplate.opsForValue().set(key, shortUrl, redisProperties.getCache().getDefaultTtl());
             log.debug("Cached ShortUrl for code: {}", shortUrl.code());
         } catch (Exception e) {
             log.warn("Failed to cache ShortUrl for code: {}", shortUrl.code(), e);
@@ -66,6 +65,6 @@ public class RedisCacheAdapter implements CachePort {
     }
     
     private String getCacheKey(String code) {
-        return CACHE_KEY_PREFIX + code;
+        return redisProperties.getCache().getKeyPrefix() + code;
     }
 }

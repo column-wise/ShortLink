@@ -1,6 +1,7 @@
 package io.github.columnwise.shortlink.adapter.cache;
 
 import io.github.columnwise.shortlink.application.port.out.UrlHitCounterPort;
+import io.github.columnwise.shortlink.config.RedisProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -11,9 +12,8 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class RedisHitCounterAdapter implements UrlHitCounterPort {
     
-    private static final String HIT_COUNT_KEY_PREFIX = "hitcount:";
-    
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final RedisTemplate<String, String> redisTemplate;
+    private final RedisProperties redisProperties;
     
     @Override
     public void incrementHitCount(String code) {
@@ -30,8 +30,8 @@ public class RedisHitCounterAdapter implements UrlHitCounterPort {
     public long getHitCount(String code) {
         try {
             String key = getHitCountKey(code);
-            Object count = redisTemplate.opsForValue().get(key);
-            return count != null ? Long.parseLong(count.toString()) : 0L;
+            String count = redisTemplate.opsForValue().get(key);
+            return count != null ? Long.parseLong(count) : 0L;
         } catch (Exception e) {
             log.warn("Failed to get hit count for code: {}", code, e);
             return 0L;
@@ -50,6 +50,6 @@ public class RedisHitCounterAdapter implements UrlHitCounterPort {
     }
     
     private String getHitCountKey(String code) {
-        return HIT_COUNT_KEY_PREFIX + code;
+        return redisProperties.getHitCounter().getKeyPrefix() + code;
     }
 }
