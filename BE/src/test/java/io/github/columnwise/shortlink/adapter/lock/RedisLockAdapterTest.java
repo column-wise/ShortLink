@@ -1,5 +1,6 @@
 package io.github.columnwise.shortlink.adapter.lock;
 
+import io.github.columnwise.shortlink.config.RedisProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,16 +20,23 @@ import static org.mockito.Mockito.*;
 class RedisLockAdapterTest {
 
     @Mock
-    private RedisTemplate<String, Object> redisTemplate;
+    private RedisTemplate<String, String> redisTemplate;
 
     @Mock
-    private ValueOperations<String, Object> valueOperations;
+    private ValueOperations<String, String> valueOperations;
+
+    @Mock
+    private RedisProperties redisProperties;
 
     private RedisLockAdapter lockAdapter;
 
     @BeforeEach
     void setUp() {
-        lockAdapter = new RedisLockAdapter(redisTemplate);
+        // Mock Redis properties
+        RedisProperties.Lock lockConfig = new RedisProperties.Lock();
+        when(redisProperties.getLock()).thenReturn(lockConfig);
+        
+        lockAdapter = new RedisLockAdapter(redisTemplate, redisProperties);
     }
 
     @Test
