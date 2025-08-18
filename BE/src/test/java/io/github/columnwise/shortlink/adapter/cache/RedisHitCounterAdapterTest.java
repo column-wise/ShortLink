@@ -1,5 +1,6 @@
 package io.github.columnwise.shortlink.adapter.cache;
 
+import io.github.columnwise.shortlink.config.RedisProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,16 +17,23 @@ import static org.mockito.Mockito.*;
 class RedisHitCounterAdapterTest {
 
     @Mock
-    private RedisTemplate<String, Object> redisTemplate;
+    private RedisTemplate<String, String> redisTemplate;
 
     @Mock
-    private ValueOperations<String, Object> valueOperations;
+    private ValueOperations<String, String> valueOperations;
+
+    @Mock
+    private RedisProperties redisProperties;
 
     private RedisHitCounterAdapter hitCounterAdapter;
 
     @BeforeEach
     void setUp() {
-        hitCounterAdapter = new RedisHitCounterAdapter(redisTemplate);
+        // Mock Redis properties
+        RedisProperties.HitCounter hitCounterConfig = new RedisProperties.HitCounter();
+        when(redisProperties.getHitCounter()).thenReturn(hitCounterConfig);
+        
+        hitCounterAdapter = new RedisHitCounterAdapter(redisTemplate, redisProperties);
     }
 
     @Test
@@ -49,7 +57,7 @@ class RedisHitCounterAdapterTest {
         // Given
         String code = "abc123";
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get("hitcount:" + code)).thenReturn(5L);
+        when(valueOperations.get("hitcount:" + code)).thenReturn("5");
 
         // When
         long result = hitCounterAdapter.getHitCount(code);
