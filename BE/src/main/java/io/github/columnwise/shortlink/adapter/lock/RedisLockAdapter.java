@@ -32,6 +32,15 @@ public class RedisLockAdapter implements DistributedLockPort {
     
     @Override
     public boolean tryLock(String key, Duration expiration) {
+        if (key == null || key.trim().isEmpty()) {
+            log.warn("Cannot acquire lock for null or empty key");
+            return false;
+        }
+        if (expiration == null || expiration.isNegative() || expiration.isZero()) {
+            log.warn("Invalid expiration duration: {}", expiration);
+            return false;
+        }
+        
         try {
             String lockKey = getLockKey(key);
             String lockValue = UUID.randomUUID().toString();
@@ -46,11 +55,11 @@ public class RedisLockAdapter implements DistributedLockPort {
                     lockValues.set(tokens);
                 }
                 tokens.put(key, lockValue);
-                log.debug("Acquired lock for key: {}", key);
+                log.debug("Successfully acquired lock for key: {} with expiration: {}", key, expiration);
                 return true;
             }
             
-            log.debug("Failed to acquire lock for key: {}", key);
+            log.debug("Failed to acquire lock for key: {} - lock already exists", key);
             return false;
         } catch (Exception e) {
             log.warn("Failed to try lock for key: {}", key, e);
@@ -60,12 +69,17 @@ public class RedisLockAdapter implements DistributedLockPort {
     
     @Override
     public void unlock(String key) {
+        if (key == null || key.trim().isEmpty()) {
+            log.warn("Cannot unlock for null or empty key");
+            return;
+        }
+        
         try {
             String lockKey = getLockKey(key);
             Map<String, String> tokens = lockValues.get();
             
             if (tokens == null || !tokens.containsKey(key)) {
-                log.warn("No lock value found for key: {}", key);
+                log.warn("No lock value found for key: {} - lock was not acquired by this thread", key);
                 return;
             }
             
@@ -79,13 +93,18 @@ public class RedisLockAdapter implements DistributedLockPort {
                     Collections.singletonList(lockKey), lockValue);
             
             if (result != null && result == 1L) {
-                log.debug("Released lock for key: {}", key);
+                log.debug("Successfully released lock for key: {}", key);
                 tokens.remove(key);
                 if (tokens.isEmpty()) {
                     lockValues.remove();
                 }
             } else {
-                log.warn("Failed to release lock for key: {} - lock may have expired", key);
+                log.warn("Failed to release lock for key: {} - lock may have expired or was acquired by another thread", key);
+                // Clean up local token even if Redis unlock failed
+                tokens.remove(key);
+                if (tokens.isEmpty()) {
+                    lockValues.remove();
+                }
             }
         } catch (Exception e) {
             log.warn("Failed to unlock for key: {}", key, e);
@@ -94,9 +113,17 @@ public class RedisLockAdapter implements DistributedLockPort {
     
     @Override
     public boolean isLocked(String key) {
+        if (key == null || key.trim().isEmpty()) {
+            log.warn("Cannot check lock status for null or empty key");
+            return false;
+        }
+        
         try {
             String lockKey = getLockKey(key);
-            return Boolean.TRUE.equals(redisTemplate.hasKey(lockKey));
+            Boolean exists = redisTemplate.hasKey(lockKey);
+            boolean result = Boolean.TRUE.equals(exists);
+            log.debug("Lock status for key: {} is {}", key, result ? "locked" : "unlocked");
+            return result;
         } catch (Exception e) {
             log.warn("Failed to check lock status for key: {}", key, e);
             return false;
