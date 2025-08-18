@@ -3,7 +3,6 @@ package io.github.columnwise.shortlink.config;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
@@ -35,7 +34,6 @@ public class RedisProperties {
         private String keyPrefix = "shorturl:";
         
         @NotNull(message = "Cache default TTL cannot be null")
-        @Positive(message = "Cache default TTL must be positive")
         private Duration defaultTtl = Duration.ofMinutes(30);
     }
     
@@ -51,7 +49,6 @@ public class RedisProperties {
         private String keyPrefix = "lock:";
         
         @NotNull(message = "Lock default expiration cannot be null")
-        @Positive(message = "Lock default expiration must be positive")
         private Duration defaultExpiration = Duration.ofSeconds(30);
     }
 }

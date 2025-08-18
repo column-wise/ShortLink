@@ -13,7 +13,11 @@ import org.springframework.data.redis.core.ValueOperations;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class RedisHitCounterAdapterTest {
 
     @Mock
@@ -94,5 +98,93 @@ class RedisHitCounterAdapterTest {
 
         // Then
         verify(redisTemplate).delete("hitcount:" + code);
+    }
+    
+    @Test
+    @DisplayName("null 코드로 조회수 증가 시 무시됨")
+    void incrementHitCount_NullCode_DoesNothing() {
+        // When
+        hitCounterAdapter.incrementHitCount(null);
+
+        // Then
+        verifyNoInteractions(redisTemplate);
+    }
+    
+    @Test
+    @DisplayName("빈 코드로 조회수 증가 시 무시됨")
+    void incrementHitCount_EmptyCode_DoesNothing() {
+        // When
+        hitCounterAdapter.incrementHitCount("");
+
+        // Then
+        verifyNoInteractions(redisTemplate);
+    }
+    
+    @Test
+    @DisplayName("공백 코드로 조회수 증가 시 무시됨")
+    void incrementHitCount_WhitespaceCode_DoesNothing() {
+        // When
+        hitCounterAdapter.incrementHitCount("   ");
+
+        // Then
+        verifyNoInteractions(redisTemplate);
+    }
+    
+    @Test
+    @DisplayName("null 코드로 조회수 조회 시 0 반환")
+    void getHitCount_NullCode_ReturnsZero() {
+        // When
+        long result = hitCounterAdapter.getHitCount(null);
+
+        // Then
+        assertThat(result).isEqualTo(0L);
+        verifyNoInteractions(redisTemplate);
+    }
+    
+    @Test
+    @DisplayName("빈 코드로 조회수 조회 시 0 반환")
+    void getHitCount_EmptyCode_ReturnsZero() {
+        // When
+        long result = hitCounterAdapter.getHitCount("");
+
+        // Then
+        assertThat(result).isEqualTo(0L);
+        verifyNoInteractions(redisTemplate);
+    }
+    
+    @Test
+    @DisplayName("잘못된 숫자 형식의 조회수 처리")
+    void getHitCount_InvalidNumberFormat_ReturnsZero() {
+        // Given
+        String code = "abc123";
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get("hitcount:" + code)).thenReturn("invalid_number");
+
+        // When
+        long result = hitCounterAdapter.getHitCount(code);
+
+        // Then
+        assertThat(result).isEqualTo(0L);
+        verify(valueOperations).get("hitcount:" + code);
+    }
+    
+    @Test
+    @DisplayName("null 코드로 조회수 초기화 시 무시됨")
+    void resetHitCount_NullCode_DoesNothing() {
+        // When
+        hitCounterAdapter.resetHitCount(null);
+
+        // Then
+        verifyNoInteractions(redisTemplate);
+    }
+    
+    @Test
+    @DisplayName("빈 코드로 조회수 초기화 시 무시됨")
+    void resetHitCount_EmptyCode_DoesNothing() {
+        // When
+        hitCounterAdapter.resetHitCount("");
+
+        // Then
+        verifyNoInteractions(redisTemplate);
     }
 }

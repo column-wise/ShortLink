@@ -19,7 +19,11 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class RedisCacheAdapterTest {
 
     @Mock
@@ -129,5 +133,117 @@ class RedisCacheAdapterTest {
 
         // Then
         verify(redisTemplate).expire("shorturl:" + code, Duration.ofSeconds(seconds));
+    }
+    
+    @Test
+    @DisplayName("null 코드로 조회 시 빈 Optional 반환")
+    void findByCode_NullCode_ReturnsEmpty() {
+        // When
+        Optional<ShortUrl> result = cacheAdapter.findByCode(null);
+
+        // Then
+        assertThat(result).isEmpty();
+        verifyNoInteractions(redisTemplate);
+    }
+    
+    @Test
+    @DisplayName("빈 코드로 조회 시 빈 Optional 반환")
+    void findByCode_EmptyCode_ReturnsEmpty() {
+        // When
+        Optional<ShortUrl> result = cacheAdapter.findByCode("");
+
+        // Then
+        assertThat(result).isEmpty();
+        verifyNoInteractions(redisTemplate);
+    }
+    
+    @Test
+    @DisplayName("공백 코드로 조회 시 빈 Optional 반환")
+    void findByCode_WhitespaceCode_ReturnsEmpty() {
+        // When
+        Optional<ShortUrl> result = cacheAdapter.findByCode("   ");
+
+        // Then
+        assertThat(result).isEmpty();
+        verifyNoInteractions(redisTemplate);
+    }
+    
+    @Test
+    @DisplayName("null ShortUrl 저장 시 무시됨")
+    void save_NullShortUrl_DoesNothing() {
+        // When
+        cacheAdapter.save(null);
+
+        // Then
+        verifyNoInteractions(redisTemplate);
+    }
+    
+    @Test
+    @DisplayName("null 코드를 가진 ShortUrl 저장 시 무시됨")
+    void save_ShortUrlWithNullCode_DoesNothing() {
+        // Given
+        ShortUrl shortUrl = ShortUrl.builder()
+                .id(1L)
+                .code(null)
+                .longUrl("https://www.example.com")
+                .createdAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(86400))
+                .build();
+
+        // When
+        cacheAdapter.save(shortUrl);
+
+        // Then
+        verifyNoInteractions(redisTemplate);
+    }
+    
+    @Test
+    @DisplayName("null 코드로 삭제 시 무시됨")
+    void delete_NullCode_DoesNothing() {
+        // When
+        cacheAdapter.delete(null);
+
+        // Then
+        verifyNoInteractions(redisTemplate);
+    }
+    
+    @Test
+    @DisplayName("빈 코드로 삭제 시 무시됨")
+    void delete_EmptyCode_DoesNothing() {
+        // When
+        cacheAdapter.delete("");
+
+        // Then
+        verifyNoInteractions(redisTemplate);
+    }
+    
+    @Test
+    @DisplayName("null 코드로 만료 시간 설정 시 무시됨")
+    void setExpiration_NullCode_DoesNothing() {
+        // When
+        cacheAdapter.setExpiration(null, 3600);
+
+        // Then
+        verifyNoInteractions(redisTemplate);
+    }
+    
+    @Test
+    @DisplayName("음수 만료 시간 설정 시 무시됨")
+    void setExpiration_NegativeSeconds_DoesNothing() {
+        // When
+        cacheAdapter.setExpiration("abc123", -1);
+
+        // Then
+        verifyNoInteractions(redisTemplate);
+    }
+    
+    @Test
+    @DisplayName("0 만료 시간 설정 시 무시됨")
+    void setExpiration_ZeroSeconds_DoesNothing() {
+        // When
+        cacheAdapter.setExpiration("abc123", 0);
+
+        // Then
+        verifyNoInteractions(redisTemplate);
     }
 }

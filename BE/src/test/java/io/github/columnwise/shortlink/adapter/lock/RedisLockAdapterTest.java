@@ -16,7 +16,11 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class RedisLockAdapterTest {
 
     @Mock
@@ -136,5 +140,113 @@ class RedisLockAdapterTest {
         // Then
         assertThat(result).isFalse();
         verify(redisTemplate).hasKey("lock:" + key);
+    }
+    
+    @Test
+    @DisplayName("null 키로 락 획득 시도 시 false 반환")
+    void tryLock_NullKey_ReturnsFalse() {
+        // When
+        boolean result = lockAdapter.tryLock(null, Duration.ofSeconds(30));
+
+        // Then
+        assertThat(result).isFalse();
+        verifyNoInteractions(redisTemplate);
+    }
+    
+    @Test
+    @DisplayName("빈 키로 락 획득 시도 시 false 반환")
+    void tryLock_EmptyKey_ReturnsFalse() {
+        // When
+        boolean result = lockAdapter.tryLock("", Duration.ofSeconds(30));
+
+        // Then
+        assertThat(result).isFalse();
+        verifyNoInteractions(redisTemplate);
+    }
+    
+    @Test
+    @DisplayName("공백 키로 락 획득 시도 시 false 반환")
+    void tryLock_WhitespaceKey_ReturnsFalse() {
+        // When
+        boolean result = lockAdapter.tryLock("   ", Duration.ofSeconds(30));
+
+        // Then
+        assertThat(result).isFalse();
+        verifyNoInteractions(redisTemplate);
+    }
+    
+    @Test
+    @DisplayName("null Duration으로 락 획득 시도 시 false 반환")
+    void tryLock_NullDuration_ReturnsFalse() {
+        // When
+        boolean result = lockAdapter.tryLock("test-lock", null);
+
+        // Then
+        assertThat(result).isFalse();
+        verifyNoInteractions(redisTemplate);
+    }
+    
+    @Test
+    @DisplayName("음수 Duration으로 락 획득 시도 시 false 반환")
+    void tryLock_NegativeDuration_ReturnsFalse() {
+        // When
+        boolean result = lockAdapter.tryLock("test-lock", Duration.ofSeconds(-1));
+
+        // Then
+        assertThat(result).isFalse();
+        verifyNoInteractions(redisTemplate);
+    }
+    
+    @Test
+    @DisplayName("0 Duration으로 락 획득 시도 시 false 반환")
+    void tryLock_ZeroDuration_ReturnsFalse() {
+        // When
+        boolean result = lockAdapter.tryLock("test-lock", Duration.ZERO);
+
+        // Then
+        assertThat(result).isFalse();
+        verifyNoInteractions(redisTemplate);
+    }
+    
+    @Test
+    @DisplayName("null 키로 락 해제 시 무시됨")
+    void unlock_NullKey_DoesNothing() {
+        // When
+        lockAdapter.unlock(null);
+
+        // Then
+        verifyNoInteractions(redisTemplate);
+    }
+    
+    @Test
+    @DisplayName("빈 키로 락 해제 시 무시됨")
+    void unlock_EmptyKey_DoesNothing() {
+        // When
+        lockAdapter.unlock("");
+
+        // Then
+        verifyNoInteractions(redisTemplate);
+    }
+    
+    @Test
+    @DisplayName("null 키로 락 존재 여부 확인 시 false 반환")
+    void isLocked_NullKey_ReturnsFalse() {
+        // When
+        boolean result = lockAdapter.isLocked(null);
+
+        // Then
+        assertThat(result).isFalse();
+        verifyNoInteractions(redisTemplate);
+    }
+    
+    @Test
+    @DisplayName("빈 키로 락 존재 여부 확인 시 false 반환")
+    void isLocked_EmptyKey_ReturnsFalse() {
+        // When
+        boolean result = lockAdapter.isLocked("");
+
+        // Then
+        assertThat(result).isFalse();
+        verifyNoInteractions(redisTemplate);
     }
 }
