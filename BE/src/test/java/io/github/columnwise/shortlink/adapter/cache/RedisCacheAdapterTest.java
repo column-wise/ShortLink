@@ -1,5 +1,6 @@
 package io.github.columnwise.shortlink.adapter.cache;
 
+import io.github.columnwise.shortlink.config.RedisProperties;
 import io.github.columnwise.shortlink.domain.model.ShortUrl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -22,16 +23,23 @@ import static org.mockito.Mockito.*;
 class RedisCacheAdapterTest {
 
     @Mock
-    private RedisTemplate<String, Object> redisTemplate;
+    private RedisTemplate<String, ShortUrl> redisTemplate;
 
     @Mock
-    private ValueOperations<String, Object> valueOperations;
+    private ValueOperations<String, ShortUrl> valueOperations;
+
+    @Mock
+    private RedisProperties redisProperties;
 
     private RedisCacheAdapter cacheAdapter;
 
     @BeforeEach
     void setUp() {
-        cacheAdapter = new RedisCacheAdapter(redisTemplate);
+        // Mock Redis properties
+        RedisProperties.Cache cacheConfig = new RedisProperties.Cache();
+        when(redisProperties.getCache()).thenReturn(cacheConfig);
+        
+        cacheAdapter = new RedisCacheAdapter(redisTemplate, redisProperties);
     }
 
     @Test
