@@ -82,6 +82,55 @@ io.github.columnwise.shortlink/
 - **Lock**: Redis 분산 락
 - **ID**: 단축 코드 생성 알고리즘
 
+## 🗂️ 시스템 아키텍처
+```mermaid
+flowchart LR
+  Client[Client]
+  LB[Load Balancer]
+
+  subgraph App[App Servers]
+    A1[App #1]
+    A2[App #2]
+    A3[App #3]
+    A4[App #4]
+  end
+
+  subgraph Redis[Redis Primary and Replicas]
+    R1[(Primary)]
+    R2[(Replica 1)]
+    R3[(Replica 2)]
+  end
+
+  subgraph DB[Database]
+    DBW[(Writer)]
+    DBR[(Reader)]
+  end
+
+  Client -->|HTTP| LB
+  LB --> A1
+  LB --> A2
+  LB --> A3
+  LB --> A4
+
+  A1 -->|cache read/write| R1
+  A2 -->|cache read/write| R1
+  A3 -->|cache read/write| R1
+  A4 -->|cache read/write| R1
+
+  A1 -->|cache read| R2
+  A2 -->|cache read| R2
+  A3 -->|cache read| R3
+  A4 -->|cache read| R3
+
+  A1 -->|DB read| DBR
+  A2 -->|DB read| DBR
+  A3 -->|DB read| DBR
+  A4 -->|DB read| DBR
+
+  R1 -->|miss / write-through| DBW
+
+```
+
 ## 🚀 주요 기능
 
 ### 분산 환경 지원
@@ -132,3 +181,32 @@ io.github.columnwise.shortlink/
 # 프로파일별 실행
 ./gradlew bootRun --args='--spring.profiles.active=local'
 ```
+
+## 📈 확장 계획
+
+### 애플리케이션 서버
+
+- 현재 4대 구성 → 트래픽 증가 시 무중단 배포/오토스케일링 지원
+- 로드밸런서(ALB/Nginx) 앞단 배치로 트래픽 분산
+- 헬스체크 기반 자동 교체
+
+### Redis
+
+- 캐시 전용 Redis는 프라이머리–리플리카 구조로 고가용성 확보
+- 초기에는 단일 샤드(프라이머리 1, 리플리카 2)
+- 트래픽이 커지면 Redis Cluster 샤딩으로 수평 확장
+- 분산락 필요 시에는 작은 전용 Redis 인스턴스 추가 (캐시와 분리)
+
+### DB
+
+- 쓰기 1대 / 읽기 1대 → 초반에는 충분
+- 조회 비중이 크므로 리드 레플리카를 다수 두어 읽기 부하 분산
+- 파티셔닝 or 샤딩은 트래픽이 폭발적으로 증가할 때 고려
+- 배치 / 통계 처리
+- 조회 로그(UrlAccessLog)는 DB에 축적
+- 장기적으로 Kafka 같은 로그 스트리밍 + Spark/Flink 기반 집계 파이프라인 확장 가능
+
+### 모니터링/운영
+
+- Prometheus + Grafana로 서버/Redis/DB 메트릭 수집
+- 장애 시 자동 페일오버(Sentinel 또는 관리형 서비스) 활용
