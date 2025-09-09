@@ -9,6 +9,7 @@ import io.github.columnwise.shortlink.domain.model.ShortUrl;
 import io.github.columnwise.shortlink.domain.model.UrlAccessLog;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,6 +30,9 @@ public class ShortUrlController {
 	private final CreateShortUrlUseCase createShortUrlUseCase;
 	private final ResolveUrlUseCase resolveUrlUseCase;
 	private final GetStatsUseCase getStatsUseCase;
+	
+	@Value("${server.url}")
+	private String serverUrl;
 
 	@PostMapping("/urls")
 	public ResponseEntity<CreateShortUrlResponse> createShortUrl(@Valid @RequestBody CreateShortUrlRequest request) {
@@ -36,7 +40,7 @@ public class ShortUrlController {
 		
 		CreateShortUrlResponse response = new CreateShortUrlResponse(
 				shortUrl.code(),
-				"http://localhost:8080/api/v1/r/" + shortUrl.code()
+				serverUrl + "/api/v1/r/" + shortUrl.code()
 		);
 		
 		return ResponseEntity.status(HttpStatus.CREATED).body(response);
