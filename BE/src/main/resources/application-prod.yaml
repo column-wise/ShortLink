@@ -31,6 +31,12 @@ server:
   url: ${SERVER_URL:https://shortlink.example.com}
   port: 8080
 
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
 logging:
   level:
     io.github.columnwise.shortlink: WARN
