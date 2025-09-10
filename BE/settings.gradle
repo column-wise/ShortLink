@@ -1,1 +1,5 @@
 rootProject.name = 'ShortLink'
+
+include 'api-server'
+include 'batch-server'
+include 'shared'
