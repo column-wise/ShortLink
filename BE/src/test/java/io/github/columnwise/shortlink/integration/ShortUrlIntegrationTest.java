@@ -2,7 +2,6 @@ package io.github.columnwise.shortlink.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.columnwise.shortlink.adapter.web.dto.CreateShortUrlRequest;
-import io.github.columnwise.shortlink.config.TestRedisConfiguration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
