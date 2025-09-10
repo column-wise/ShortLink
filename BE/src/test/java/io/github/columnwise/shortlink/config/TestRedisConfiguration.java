@@ -12,19 +12,21 @@ import static org.mockito.Mockito.mock;
 public class TestRedisConfiguration {
 
     @Bean
-    @Primary
-    public RedisTemplate<String, ShortUrl> shortUrlRedisTemplate() {
+    public RedisTemplate<String, ShortUrl> redisTemplate() {
         return mock(RedisTemplate.class);
     }
 
     @Bean
-    @Primary
+    public RedisTemplate<String, Object> objectRedisTemplate() {
+        return mock(RedisTemplate.class);
+    }
+
+    @Bean
     public RedisTemplate<String, String> stringRedisTemplate() {
         return mock(RedisTemplate.class);
     }
 
     @Bean
-    @Primary
     public RedisProperties redisProperties() {
         return new RedisProperties();
     }
