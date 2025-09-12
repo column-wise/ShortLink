@@ -7,6 +7,7 @@ import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.launch.JobLauncher;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -24,9 +25,11 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DistributedStatisticsJobScheduler {
 
+    @Qualifier("asyncJobLauncher")
     private final JobLauncher jobLauncher;
     private final Job statisticsAggregationJob;
-    private final RedisTemplate<String, Object> redisTemplate;
+    @Qualifier("stringRedisTemplate")
+    private final RedisTemplate<String, String> redisTemplate;
     
     private final String instanceId = generateInstanceId();
 
