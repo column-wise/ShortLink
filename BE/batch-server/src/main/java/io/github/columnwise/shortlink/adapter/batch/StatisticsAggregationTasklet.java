@@ -20,12 +20,21 @@ public class StatisticsAggregationTasklet implements Tasklet {
     public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) throws Exception {
         log.info("Starting statistics aggregation tasklet");
 
-        int processedCount = aggregateStatisticsUseCase.aggregateTodayStatistics();
+        // Job Parameters에서 targetDate 추출, 없으면 현재 날짜 사용
+        String targetDateStr = chunkContext.getStepContext().getJobParameters().get("targetDate");
+        java.time.LocalDate targetDate = targetDateStr != null ? 
+            java.time.LocalDate.parse(targetDateStr.toString()) : java.time.LocalDate.now();
+        
+        log.info("Processing statistics for date: {}", targetDate);
+
+        int processedCount = aggregateStatisticsUseCase.aggregateStatisticsForDate(targetDate);
         
         contribution.getStepExecution().getExecutionContext()
-                   .put("processedCount", processedCount);
+                   .put("processedCount", processedCount)
+                   .put("targetDate", targetDate.toString());
 
-        log.info("Statistics aggregation tasklet completed. Processed {} items", processedCount);
+        log.info("Statistics aggregation tasklet completed. Processed {} items for date {}", 
+                processedCount, targetDate);
 
         return RepeatStatus.FINISHED;
     }
