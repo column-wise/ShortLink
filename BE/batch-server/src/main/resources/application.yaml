@@ -19,13 +19,21 @@ spring:
     hibernate:
       ddl-auto: create-drop
     show-sql: true
-  redis:
-    host: localhost
-    port: 6379
-    password: ${REDIS_PASSWORD:}
   batch:
     job:
       enabled: false  # 자동 실행 방지, 스케줄러로 제어
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: ${REDIS_PASSWORD:}
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
 
 ---
 spring:
@@ -41,10 +49,18 @@ spring:
     hibernate:
       ddl-auto: validate
     show-sql: false
-  redis:
-    host: ${REDIS_HOST}
-    port: ${REDIS_PORT}
-    password: ${REDIS_PASSWORD:}
   batch:
     job:
       enabled: false
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD:}
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 4
+          max-wait: 2000ms

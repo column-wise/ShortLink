@@ -88,17 +88,24 @@ flowchart LR
   Client[Client]
   LB[Load Balancer]
 
-  subgraph App[App Servers]
-    A1[App #1]
-    A2[App #2]
-    A3[App #3]
-    A4[App #4]
+  subgraph App[API Servers]
+    A1[API #1]
+    A2[API #2]
+    A3[API #3]
+    A4[API #4]
   end
 
-  subgraph Redis[Redis Primary and Replicas]
-    R1[(Primary)]
-    R2[(Replica 1)]
-    R3[(Replica 2)]
+  subgraph Batch[Batch Servers]
+    B1[Batch #1]
+    B2[Batch #2]
+  end
+
+  subgraph Redis[Redis High Availability]
+    RM[(Master)]
+    RR1[(Replica 1)]
+    RR2[(Replica 2)]
+    RM --- RR1
+    RM --- RR2
   end
 
   subgraph DB[Database]
@@ -112,31 +119,38 @@ flowchart LR
   LB --> A3
   LB --> A4
 
-  A1 -->|cache read/write| R1
-  A2 -->|cache read/write| R1
-  A3 -->|cache read/write| R1
-  A4 -->|cache read/write| R1
+  A1 -->|cache/counter/lock| RM
+  A2 -->|cache/counter/lock| RM
+  A3 -->|cache/counter/lock| RM
+  A4 -->|cache/counter/lock| RM
 
-  A1 -->|cache read| R2
-  A2 -->|cache read| R2
-  A3 -->|cache read| R3
-  A4 -->|cache read| R3
+  A1 -->|cache read| RR1
+  A2 -->|cache read| RR1
+  A3 -->|cache read| RR2
+  A4 -->|cache read| RR2
 
-  A1 -->|DB read| DBR
-  A2 -->|DB read| DBR
-  A3 -->|DB read| DBR
-  A4 -->|DB read| DBR
+  B1 -->|statistics/lock| RM
+  B2 -->|statistics/lock| RM
 
-  R1 -->|miss / write-through| DBW
+  A1 -->|DB read/write| DBR
+  A2 -->|DB read/write| DBR
+  A3 -->|DB read/write| DBR
+  A4 -->|DB read/write| DBR
+
+  B1 -->|statistics write| DBW
+  B2 -->|statistics write| DBW
+
+  B1 -.->|distributed lock| B2
 
 ```
 
 ## 🚀 주요 기능
 
 ### 분산 환경 지원
-- **Redis 캐싱**: 인기 URL 빠른 응답
-- **분산 락**: 동시 요청 충돌 방지  
+- **Redis 고가용성**: Master-Replica 구조로 장애 복구 지원 (1 Master + 2 Replica)
+- **분산 락**: 동시 요청 충돌 방지 및 배치 작업 중복 실행 방지
 - **조회수 카운터**: 원자적 증감 연산
+- **배치 처리**: 다중 인스턴스 환경에서 분산 락 기반 통계 집계
 - **다중 ID 생성 전략**: Base62, Snowflake, Hash-based
 
 ### 성능 최적화
@@ -190,21 +204,25 @@ flowchart LR
 - 로드밸런서(ALB/Nginx) 앞단 배치로 트래픽 분산
 - 헬스체크 기반 자동 교체
 
-### Redis
+### Redis 고가용성
 
-- 캐시 전용 Redis는 프라이머리–리플리카 구조로 고가용성 확보
-- 초기에는 단일 샤드(프라이머리 1, 리플리카 2)
-- 트래픽이 커지면 Redis Cluster 샤딩으로 수평 확장
-- 분산락 필요 시에는 작은 전용 Redis 인스턴스 추가 (캐시와 분리)
+- **Master-Replica 구조**: 1개 Master + 2개 Replica로 장애 복구 지원
+- **읽기 성능 향상**: Replica에서 읽기 작업 분산 처리
+- **장애 대응**: Master 장애 시 Replica가 자동으로 Master로 승격 (Sentinel/ElastiCache)
+- **향후 확장**: 필요시 Redis Cluster로 마이그레이션 가능한 해시 태그 기반 키 구조
 
 ### DB
 
 - 쓰기 1대 / 읽기 1대 → 초반에는 충분
 - 조회 비중이 크므로 리드 레플리카를 다수 두어 읽기 부하 분산
 - 파티셔닝 or 샤딩은 트래픽이 폭발적으로 증가할 때 고려
-- 배치 / 통계 처리
-- 조회 로그(UrlAccessLog)는 DB에 축적
-- 장기적으로 Kafka 같은 로그 스트리밍 + Spark/Flink 기반 집계 파이프라인 확장 가능
+
+### 배치 서버
+
+- **이중화 구성**: 2대 배치 서버로 고가용성 확보
+- **분산 락**: Redis 기반 Lua 스크립트로 중복 실행 방지
+- **스케줄링**: 매시간/일일 통계 집계 자동화
+- **장애 복구**: Redis/DB 개별 장애 시에도 통계 처리 지속
 
 ### 모니터링/운영
 
