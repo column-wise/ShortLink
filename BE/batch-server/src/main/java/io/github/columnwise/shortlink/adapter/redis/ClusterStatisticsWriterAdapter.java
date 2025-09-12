@@ -4,6 +4,7 @@ import io.github.columnwise.shortlink.application.port.out.StatisticsWriter;
 import io.github.columnwise.shortlink.domain.service.RedisKeyManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
@@ -18,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class ClusterStatisticsWriterAdapter implements StatisticsWriter {
 
+    @Qualifier("jsonRedisTemplate")
     private final RedisTemplate<String, Object> redisTemplate;
 
     @Override

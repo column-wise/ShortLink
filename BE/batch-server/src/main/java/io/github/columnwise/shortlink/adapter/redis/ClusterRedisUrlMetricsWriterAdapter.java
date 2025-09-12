@@ -4,6 +4,7 @@ import io.github.columnwise.shortlink.application.port.out.UrlMetricsWriter;
 import io.github.columnwise.shortlink.domain.service.RedisKeyManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
@@ -15,7 +16,8 @@ import java.time.LocalDate;
 @RequiredArgsConstructor
 public class ClusterRedisUrlMetricsWriterAdapter implements UrlMetricsWriter {
 
-    private final RedisTemplate<String, Object> redisTemplate;
+    @Qualifier("stringRedisTemplate")
+    private final RedisTemplate<String, String> redisTemplate;
 
     @Override
     public long incrementTotalAccessCount(String code, long increment) {
