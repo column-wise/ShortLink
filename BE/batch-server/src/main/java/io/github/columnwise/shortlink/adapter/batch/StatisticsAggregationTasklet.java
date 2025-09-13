@@ -9,6 +9,11 @@ import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -20,10 +25,9 @@ public class StatisticsAggregationTasklet implements Tasklet {
     public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) throws Exception {
         log.info("Starting statistics aggregation tasklet");
 
-        // Job Parameters에서 targetDate 추출, 없으면 현재 날짜 사용
+        // Job Parameters에서 targetDate 추출, 없으면 UTC 기준 현재 날짜 사용
         Object targetDateObj = chunkContext.getStepContext().getJobParameters().get("targetDate");
-        java.time.LocalDate targetDate = targetDateObj != null ? 
-            java.time.LocalDate.parse(targetDateObj.toString()) : java.time.LocalDate.now();
+        LocalDate targetDate = parseTargetDate(targetDateObj);
         
         log.info("Processing statistics for date: {}", targetDate);
 
@@ -38,5 +42,43 @@ public class StatisticsAggregationTasklet implements Tasklet {
                 processedCount, targetDate);
 
         return RepeatStatus.FINISHED;
+    }
+    
+    /**
+     * 다양한 형식의 날짜 입력을 파싱하여 LocalDate로 변환
+     * 
+     * @param targetDateObj Job Parameter로 전달된 날짜 객체
+     * @return 파싱된 LocalDate, 실패 시 UTC 기준 현재 날짜
+     */
+    private LocalDate parseTargetDate(Object targetDateObj) {
+        if (targetDateObj == null) {
+            return LocalDate.now(ZoneId.of("UTC"));
+        }
+        
+        String dateString = targetDateObj.toString().trim();
+        if (dateString.isEmpty()) {
+            return LocalDate.now(ZoneId.of("UTC"));
+        }
+        
+        // 다양한 날짜 형식 시도
+        DateTimeFormatter[] formatters = {
+            DateTimeFormatter.ISO_LOCAL_DATE,      // 2024-09-13
+            DateTimeFormatter.ofPattern("yyyy/MM/dd"),    // 2024/09/13
+            DateTimeFormatter.ofPattern("yyyy-MM-dd"),    // 2024-09-13
+            DateTimeFormatter.ofPattern("yyyyMMdd")       // 20240913
+        };
+        
+        for (DateTimeFormatter formatter : formatters) {
+            try {
+                LocalDate parsed = LocalDate.parse(dateString, formatter);
+                log.debug("Successfully parsed target date: {} -> {}", dateString, parsed);
+                return parsed;
+            } catch (DateTimeParseException e) {
+                // 다음 포맷터 시도
+            }
+        }
+        
+        log.warn("Failed to parse target date: '{}', using UTC current date", dateString);
+        return LocalDate.now(ZoneId.of("UTC"));
     }
 }
