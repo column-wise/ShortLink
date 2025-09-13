@@ -9,6 +9,7 @@ import io.github.columnwise.shortlink.domain.model.ShortUrl;
 import io.github.columnwise.shortlink.domain.model.DailyStatistics;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -106,7 +107,7 @@ public class ShortUrlController {
 		@ApiResponse(
 			responseCode = "200",
 			description = "통계 조회 성공",
-			content = @Content(schema = @Schema(implementation = DailyStatistics.class))
+			content = @Content(array = @ArraySchema(schema = @Schema(implementation = DailyStatistics.class)))
 		),
 		@ApiResponse(
 			responseCode = "404",

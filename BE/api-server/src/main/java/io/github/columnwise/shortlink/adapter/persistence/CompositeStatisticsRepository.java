@@ -100,7 +100,7 @@ public class CompositeStatisticsRepository implements StatisticsRepository {
         
         ScanOptions scanOptions = ScanOptions.scanOptions()
                 .match(pattern)
-                .count(100)
+                .count(1000)
                 .build();
         
         long count = 0;
@@ -112,7 +112,8 @@ public class CompositeStatisticsRepository implements StatisticsRepository {
                 }
             }
         } catch (Exception e) {
-            log.error("Failed to scan Redis keys for pattern: {}", pattern, e);
+            log.error("Failed to scan Redis keys for pattern: {} on date: {}", pattern, date, e);
+            return 0;
         }
         
         return count;
