@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -21,12 +23,18 @@ class ResolveUrlServiceTest {
 
     @Mock
     private ShortUrlRepositoryPort shortUrlRepository;
+    
+    @Mock
+    private RedisTemplate<String, String> redisTemplate;
+    
+    @Mock
+    private ValueOperations<String, String> valueOperations;
 
     private ResolveUrlService resolveUrlService;
 
     @BeforeEach
     void setUp() {
-        resolveUrlService = new ResolveUrlService(shortUrlRepository);
+        resolveUrlService = new ResolveUrlService(shortUrlRepository, redisTemplate);
     }
 
     @Test
@@ -45,6 +53,7 @@ class ResolveUrlServiceTest {
                 .build();
 
         when(shortUrlRepository.findByCode(code)).thenReturn(Optional.of(shortUrl));
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
         // When
         String result = resolveUrlService.resolveUrl(code);
@@ -52,6 +61,7 @@ class ResolveUrlServiceTest {
         // Then
         assertThat(result).isEqualTo(longUrl);
         verify(shortUrlRepository).findByCode(code);
+        verify(valueOperations).set(argThat(key -> key.startsWith("url:access:count:" + code + ":")), eq("1"));
     }
 
     @Test
@@ -68,5 +78,6 @@ class ResolveUrlServiceTest {
                 .hasMessageContaining("URL not found for code: " + code);
         
         verify(shortUrlRepository).findByCode(code);
+        verifyNoInteractions(valueOperations);
     }
 }
