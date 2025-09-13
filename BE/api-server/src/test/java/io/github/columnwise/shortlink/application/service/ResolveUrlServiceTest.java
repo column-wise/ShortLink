@@ -9,8 +9,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 
+import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
@@ -21,12 +26,21 @@ class ResolveUrlServiceTest {
 
     @Mock
     private ShortUrlRepositoryPort shortUrlRepository;
+    
+    @Mock
+    private RedisTemplate<String, String> redisTemplate;
+    
+    @Mock
+    private ValueOperations<String, String> valueOperations;
+    
+    @Mock
+    private Clock clock;
 
     private ResolveUrlService resolveUrlService;
 
     @BeforeEach
     void setUp() {
-        resolveUrlService = new ResolveUrlService(shortUrlRepository);
+        resolveUrlService = new ResolveUrlService(shortUrlRepository, redisTemplate, clock);
     }
 
     @Test
@@ -35,6 +49,7 @@ class ResolveUrlServiceTest {
         // Given
         String code = "abc123";
         String longUrl = "https://www.example.com";
+        LocalDateTime fixedTime = LocalDateTime.of(2024, 1, 1, 12, 0, 0);
         
         ShortUrl shortUrl = ShortUrl.builder()
                 .id(1L)
@@ -45,6 +60,9 @@ class ResolveUrlServiceTest {
                 .build();
 
         when(shortUrlRepository.findByCode(code)).thenReturn(Optional.of(shortUrl));
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(clock.instant()).thenReturn(fixedTime.toInstant(ZoneOffset.UTC));
+        when(clock.getZone()).thenReturn(ZoneOffset.UTC);
 
         // When
         String result = resolveUrlService.resolveUrl(code);
@@ -52,6 +70,13 @@ class ResolveUrlServiceTest {
         // Then
         assertThat(result).isEqualTo(longUrl);
         verify(shortUrlRepository).findByCode(code);
+        
+        // 방문 기록이 Redis에 저장되었는지 확인 (구현 디테일이 아닌 행위 검증)
+        verify(redisTemplate).opsForValue();
+        verify(valueOperations).set(
+            argThat(key -> key.matches("url:access:count:" + code + ":\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}")), 
+            eq("1")
+        );
     }
 
     @Test
@@ -68,5 +93,6 @@ class ResolveUrlServiceTest {
                 .hasMessageContaining("URL not found for code: " + code);
         
         verify(shortUrlRepository).findByCode(code);
+        verifyNoInteractions(redisTemplate);
     }
 }

@@ -14,8 +14,18 @@ public class EmbeddedRedisConfiguration {
     
     @PostConstruct
     public void startRedis() throws IOException {
-        redisServer = new RedisServer(6370); // 다른 포트 사용
+        int port = findAvailablePort();
+        redisServer = new RedisServer(port);
         redisServer.start();
+        System.setProperty("spring.redis.port", String.valueOf(port));
+    }
+    
+    private int findAvailablePort() {
+        try (java.net.ServerSocket socket = new java.net.ServerSocket(0)) {
+            return socket.getLocalPort();
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to find available port", e);
+        }
     }
     
     @PreDestroy

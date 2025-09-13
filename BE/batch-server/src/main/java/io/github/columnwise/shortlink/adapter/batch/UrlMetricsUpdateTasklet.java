@@ -21,16 +21,17 @@ public class UrlMetricsUpdateTasklet implements Tasklet {
         log.info("Starting URL metrics update tasklet");
 
         // Job Parameters에서 targetDate 추출, 없으면 현재 날짜 사용
-        String targetDateStr = chunkContext.getStepContext().getJobParameters().get("targetDate");
-        java.time.LocalDate targetDate = targetDateStr != null ? 
-            java.time.LocalDate.parse(targetDateStr.toString()) : java.time.LocalDate.now();
+        Object targetDateObj = chunkContext.getStepContext().getJobParameters().get("targetDate");
+        java.time.LocalDate targetDate = targetDateObj != null ? 
+            java.time.LocalDate.parse(targetDateObj.toString()) : java.time.LocalDate.now();
         
         log.info("Updating URL metrics for date: {}", targetDate);
 
         int updatedCount = updateUrlMetricsUseCase.updateUrlMetricsForDate(targetDate);
         
         contribution.getStepExecution().getExecutionContext()
-                   .put("updatedCount", updatedCount)
+                   .put("updatedCount", updatedCount);
+        contribution.getStepExecution().getExecutionContext()
                    .put("targetDate", targetDate.toString());
 
         log.info("URL metrics update tasklet completed. Updated {} URLs for date {}", 

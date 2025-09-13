@@ -22,6 +22,7 @@ public class RedisKeyManager {
     // 분산 락
     private static final String BATCH_LOCK_KEY_TEMPLATE = "batch:lock:aggregation:{%s}";
     private static final String PROCESSED_MARKER_TEMPLATE = "batch:processed:{%s}:%s";
+    private static final String PROCESSING_MARKER_TEMPLATE = "batch:processing:{%s}:%s";
     
     public static String getAccessCountKey(String code, LocalDate date) {
         String dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
@@ -61,6 +62,11 @@ public class RedisKeyManager {
     public static String getProcessedMarkerKey(String code, LocalDate date) {
         String dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
         return String.format(PROCESSED_MARKER_TEMPLATE, dateKey, code);
+    }
+    
+    public static String getProcessingMarkerKey(String code, LocalDate date) {
+        String dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
+        return String.format(PROCESSING_MARKER_TEMPLATE, dateKey, code);
     }
     
     /**

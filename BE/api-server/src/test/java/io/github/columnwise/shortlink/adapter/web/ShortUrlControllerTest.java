@@ -7,7 +7,7 @@ import io.github.columnwise.shortlink.application.port.in.GetStatsUseCase;
 import io.github.columnwise.shortlink.application.port.in.ResolveUrlUseCase;
 import io.github.columnwise.shortlink.domain.exception.UrlNotFoundException;
 import io.github.columnwise.shortlink.domain.model.ShortUrl;
-import io.github.columnwise.shortlink.domain.model.UrlAccessLog;
+import io.github.columnwise.shortlink.domain.model.DailyStatistics;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +18,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.eq;
@@ -116,36 +117,36 @@ class ShortUrlControllerTest {
 
     @Test
     @DisplayName("통계 조회 성공")
-    void getAccessLogs_Success() throws Exception {
+    void getDailyStatistics_Success() throws Exception {
         // Given
         String code = "abc123";
-        List<UrlAccessLog> mockLogs = List.of(
-                UrlAccessLog.builder()
-                        .id(1L)
+        List<DailyStatistics> mockStats = List.of(
+                DailyStatistics.builder()
                         .code(code)
-                        .accessedAt(Instant.now())
-                        .ipAddress("192.168.1.1")
-                        .userAgent("Mozilla/5.0")
+                        .date(LocalDate.of(2024, 1, 1))
+                        .accessCount(25)
+                        .uniqueVisitors(18)
                         .build()
         );
 
-        when(getStatsUseCase.getAccessLogs(eq(code))).thenReturn(mockLogs);
+        when(getStatsUseCase.getDailyStatistics(eq(code), eq(null), eq(null))).thenReturn(mockStats);
 
         // When & Then
         mockMvc.perform(get("/api/v1/urls/" + code + "/stats"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$[0].code").value(code))
-                .andExpect(jsonPath("$[0].ipAddress").value("192.168.1.1"));
+                .andExpect(jsonPath("$[0].accessCount").value(25))
+                .andExpect(jsonPath("$[0].uniqueVisitors").value(18));
     }
 
     @Test
     @DisplayName("존재하지 않는 코드의 통계 조회")
-    void getAccessLogs_NotFound() throws Exception {
+    void getDailyStatistics_NotFound() throws Exception {
         // Given
         String code = "notfound";
 
-        when(getStatsUseCase.getAccessLogs(eq(code)))
+        when(getStatsUseCase.getDailyStatistics(eq(code), eq(null), eq(null)))
                 .thenThrow(new UrlNotFoundException("URL not found for code: " + code));
 
         // When & Then

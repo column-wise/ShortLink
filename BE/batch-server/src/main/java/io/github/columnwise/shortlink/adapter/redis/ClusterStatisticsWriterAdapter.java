@@ -19,8 +19,8 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class ClusterStatisticsWriterAdapter implements StatisticsWriter {
 
-    @Qualifier("jsonRedisTemplate")
-    private final RedisTemplate<String, Object> redisTemplate;
+    @Qualifier("customStringRedisTemplate") 
+    private final RedisTemplate<String, String> redisTemplate;
 
     @Override
     public void saveDailyStatistics(String code, LocalDate date, long accessCount, 
