@@ -21,16 +21,17 @@ public class StatisticsAggregationTasklet implements Tasklet {
         log.info("Starting statistics aggregation tasklet");
 
         // Job Parameters에서 targetDate 추출, 없으면 현재 날짜 사용
-        String targetDateStr = chunkContext.getStepContext().getJobParameters().get("targetDate");
-        java.time.LocalDate targetDate = targetDateStr != null ? 
-            java.time.LocalDate.parse(targetDateStr.toString()) : java.time.LocalDate.now();
+        Object targetDateObj = chunkContext.getStepContext().getJobParameters().get("targetDate");
+        java.time.LocalDate targetDate = targetDateObj != null ? 
+            java.time.LocalDate.parse(targetDateObj.toString()) : java.time.LocalDate.now();
         
         log.info("Processing statistics for date: {}", targetDate);
 
         int processedCount = aggregateStatisticsUseCase.aggregateStatisticsForDate(targetDate);
         
         contribution.getStepExecution().getExecutionContext()
-                   .put("processedCount", processedCount)
+                   .put("processedCount", processedCount);
+        contribution.getStepExecution().getExecutionContext()
                    .put("targetDate", targetDate.toString());
 
         log.info("Statistics aggregation tasklet completed. Processed {} items for date {}", 
