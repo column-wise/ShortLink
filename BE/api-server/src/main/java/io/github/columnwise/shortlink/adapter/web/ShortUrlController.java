@@ -110,6 +110,10 @@ public class ShortUrlController {
 			content = @Content(array = @ArraySchema(schema = @Schema(implementation = DailyStatistics.class)))
 		),
 		@ApiResponse(
+			responseCode = "400",
+			description = "잘못된 요청 (잘못된 날짜 형식 또는 시작일이 종료일보다 늦은 경우)"
+		),
+		@ApiResponse(
 			responseCode = "404",
 			description = "존재하지 않는 단축 코드"
 		)
