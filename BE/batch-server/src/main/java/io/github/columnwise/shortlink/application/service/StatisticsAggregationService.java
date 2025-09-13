@@ -125,7 +125,7 @@ public class StatisticsAggregationService implements AggregateStatisticsUseCase 
     
     private boolean markAsProcessing(String code, LocalDate date) {
         try {
-            String processingKey = "batch:processing:" + code + ":" + date.format(DateTimeFormatter.ISO_LOCAL_DATE);
+            String processingKey = RedisKeyManager.getProcessingMarkerKey(code, date);
             // 10분 TTL로 처리 중 마킹 (처리가 오래 걸리거나 실패해도 자동 해제)
             Boolean result = redisTemplate.opsForValue().setIfAbsent(processingKey, "processing", 10, TimeUnit.MINUTES);
             return Boolean.TRUE.equals(result);
@@ -137,7 +137,7 @@ public class StatisticsAggregationService implements AggregateStatisticsUseCase 
     
     private void clearProcessingMark(String code, LocalDate date) {
         try {
-            String processingKey = "batch:processing:" + code + ":" + date.format(DateTimeFormatter.ISO_LOCAL_DATE);
+            String processingKey = RedisKeyManager.getProcessingMarkerKey(code, date);
             redisTemplate.delete(processingKey);
         } catch (Exception e) {
             log.warn("Failed to clear processing mark for code: {}, date: {}", code, date, e);

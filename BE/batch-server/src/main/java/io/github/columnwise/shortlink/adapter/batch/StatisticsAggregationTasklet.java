@@ -60,11 +60,10 @@ public class StatisticsAggregationTasklet implements Tasklet {
             return LocalDate.now(ZoneId.of("UTC"));
         }
         
-        // 다양한 날짜 형식 시도
+        // 다양한 날짜 형식 시도 (중복 제거)
         DateTimeFormatter[] formatters = {
-            DateTimeFormatter.ISO_LOCAL_DATE,      // 2024-09-13
+            DateTimeFormatter.ISO_LOCAL_DATE,      // 2024-09-13 (yyyy-MM-dd와 동일)
             DateTimeFormatter.ofPattern("yyyy/MM/dd"),    // 2024/09/13
-            DateTimeFormatter.ofPattern("yyyy-MM-dd"),    // 2024-09-13
             DateTimeFormatter.ofPattern("yyyyMMdd")       // 20240913
         };
         

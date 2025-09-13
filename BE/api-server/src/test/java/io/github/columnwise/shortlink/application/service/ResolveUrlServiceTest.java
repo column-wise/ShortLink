@@ -70,7 +70,13 @@ class ResolveUrlServiceTest {
         // Then
         assertThat(result).isEqualTo(longUrl);
         verify(shortUrlRepository).findByCode(code);
-        verify(valueOperations).set(argThat(key -> key.startsWith("url:access:count:" + code + ":")), eq("1"));
+        
+        // 방문 기록이 Redis에 저장되었는지 확인 (구현 디테일이 아닌 행위 검증)
+        verify(redisTemplate).opsForValue();
+        verify(valueOperations).set(
+            argThat(key -> key.matches("url:access:count:" + code + ":\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}")), 
+            eq("1")
+        );
     }
 
     @Test

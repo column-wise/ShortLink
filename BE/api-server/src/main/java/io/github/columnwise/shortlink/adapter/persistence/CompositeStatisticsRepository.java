@@ -120,8 +120,28 @@ public class CompositeStatisticsRepository implements StatisticsRepository {
     }
     
     private long estimateUniqueVisitors(long accessCount) {
-        // 간단한 추정: 접근 횟수의 70-80% 정도를 고유 방문자로 추정
-        // 실제로는 더 정교한 로직이나 별도 카운터가 필요
-        return Math.round(accessCount * 0.75);
+        if (accessCount <= 0) {
+            return 0;
+        }
+        
+        // 현실적인 고유 방문자 추정 알고리즘:
+        // - 낮은 접근수: 고유 방문자 비율 높음 (90-95%)
+        // - 중간 접근수: 중간 비율 (70-80%)  
+        // - 높은 접근수: 중복 증가로 비율 감소 (50-70%)
+        
+        double uniqueRatio;
+        if (accessCount <= 10) {
+            // 1-10 접근: 거의 모두 고유 방문자
+            uniqueRatio = 0.95 - (accessCount - 1) * 0.02; // 95% -> 77%
+        } else if (accessCount <= 100) {
+            // 11-100 접근: 점진적 중복 증가
+            uniqueRatio = 0.77 - Math.log10(accessCount - 9) * 0.15; // 77% -> 62%
+        } else {
+            // 100+ 접근: 상당한 중복, 로그 스케일로 감소
+            uniqueRatio = 0.62 - Math.log10(accessCount / 100.0) * 0.1;
+            uniqueRatio = Math.max(uniqueRatio, 0.3); // 최소 30% 보장
+        }
+        
+        return Math.max(1, Math.round(accessCount * uniqueRatio));
     }
 }

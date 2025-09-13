@@ -119,21 +119,26 @@ public class ShortUrlController {
 		@PathVariable("code") String code,
 		
 		@Parameter(description = "시작 날짜 (YYYY-MM-DD, 생략시 30일 전)", example = "2024-01-01")
-		@RequestParam(required = false, defaultValue = "") 
+		@RequestParam(required = false) 
 		@org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
 		LocalDate startDate,
 		
 		@Parameter(description = "종료 날짜 (YYYY-MM-DD, 생략시 오늘)", example = "2024-01-31")
-		@RequestParam(required = false, defaultValue = "")
+		@RequestParam(required = false)
 		@org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
 		LocalDate endDate
 	) {
-		// 기본값 처리: startDate가 null이면 30일 전, endDate가 null이면 오늘
+		// 기본값 처리와 검증
 		if (startDate == null) {
 			startDate = LocalDate.now().minusDays(30);
 		}
 		if (endDate == null) {
 			endDate = LocalDate.now();
+		}
+		
+		// 날짜 범위 검증: 시작일이 종료일보다 늦으면 안됨
+		if (startDate.isAfter(endDate)) {
+			throw new IllegalArgumentException("Start date cannot be after end date");
 		}
 		
 		List<DailyStatistics> statistics = getStatsUseCase.getDailyStatistics(code, startDate, endDate);
