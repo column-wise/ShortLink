@@ -6,7 +6,7 @@ import io.github.columnwise.shortlink.application.port.in.CreateShortUrlUseCase;
 import io.github.columnwise.shortlink.application.port.in.GetStatsUseCase;
 import io.github.columnwise.shortlink.application.port.in.ResolveUrlUseCase;
 import io.github.columnwise.shortlink.domain.model.ShortUrl;
-import io.github.columnwise.shortlink.domain.model.UrlAccessLog;
+import io.github.columnwise.shortlink.domain.model.DailyStatistics;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -24,9 +24,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.view.RedirectView;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -97,25 +99,35 @@ public class ShortUrlController {
 
 	@GetMapping("/urls/{code}/stats")
 	@Operation(
-		summary = "URL 접속 통계 조회",
-		description = "특정 단축 URL의 접속 로그 및 통계 정보를 조회합니다."
+		summary = "URL 일별 접속 통계 조회",
+		description = "특정 단축 URL의 일별 접속 통계 목록을 조회합니다. 프론트엔드에서 시간대별, 요일별 분석이 가능합니다."
 	)
 	@ApiResponses({
 		@ApiResponse(
 			responseCode = "200",
 			description = "통계 조회 성공",
-			content = @Content(schema = @Schema(implementation = UrlAccessLog.class))
+			content = @Content(schema = @Schema(implementation = DailyStatistics.class))
 		),
 		@ApiResponse(
 			responseCode = "404",
 			description = "존재하지 않는 단축 코드"
 		)
 	})
-	public ResponseEntity<List<UrlAccessLog>> getAccessLogs(
+	public ResponseEntity<List<DailyStatistics>> getDailyStatistics(
 		@Parameter(description = "단축 코드", required = true, example = "abc123")
-		@PathVariable("code") String code
+		@PathVariable("code") String code,
+		
+		@Parameter(description = "시작 날짜 (YYYY-MM-DD, 생략시 30일 전)", example = "2024-01-01")
+		@RequestParam(required = false) 
+		@org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
+		LocalDate startDate,
+		
+		@Parameter(description = "종료 날짜 (YYYY-MM-DD, 생략시 오늘)", example = "2024-01-31")
+		@RequestParam(required = false)
+		@org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
+		LocalDate endDate
 	) {
-		List<UrlAccessLog> accessLogs = getStatsUseCase.getAccessLogs(code);
-		return ResponseEntity.ok(accessLogs);
+		List<DailyStatistics> statistics = getStatsUseCase.getDailyStatistics(code, startDate, endDate);
+		return ResponseEntity.ok(statistics);
 	}
 }
