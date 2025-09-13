@@ -78,6 +78,6 @@ class ResolveUrlServiceTest {
                 .hasMessageContaining("URL not found for code: " + code);
         
         verify(shortUrlRepository).findByCode(code);
-        verifyNoInteractions(valueOperations);
+        verifyNoInteractions(redisTemplate);
     }
 }
