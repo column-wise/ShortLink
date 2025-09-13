@@ -22,11 +22,18 @@ public class RedisStatisticsReaderAdapter implements RedisStatisticsReader {
 
     @Override
     public Set<String> findAccessCountKeys(LocalDate date) {
-        String dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
-        String pattern = ACCESS_COUNT_KEY_PREFIX + "*:" + dateKey;
+        // 모든 접근 카운트 키를 조회한 후, 해당 날짜에 해당하는 것만 필터링
+        String pattern = ACCESS_COUNT_KEY_PREFIX + "*";
+        Set<String> allKeys = redisTemplate.keys(pattern);
         
-        Set<String> keys = redisTemplate.keys(pattern);
-        return keys != null ? keys : Collections.emptySet();
+        if (allKeys == null || allKeys.isEmpty()) {
+            return Collections.emptySet();
+        }
+        
+        String targetDatePrefix = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
+        return allKeys.stream()
+                .filter(key -> key.contains(targetDatePrefix))
+                .collect(java.util.stream.Collectors.toSet());
     }
 
     @Override
