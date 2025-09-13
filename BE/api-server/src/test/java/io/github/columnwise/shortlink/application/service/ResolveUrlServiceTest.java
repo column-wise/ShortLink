@@ -12,7 +12,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
+import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
@@ -29,12 +32,15 @@ class ResolveUrlServiceTest {
     
     @Mock
     private ValueOperations<String, String> valueOperations;
+    
+    @Mock
+    private Clock clock;
 
     private ResolveUrlService resolveUrlService;
 
     @BeforeEach
     void setUp() {
-        resolveUrlService = new ResolveUrlService(shortUrlRepository, redisTemplate);
+        resolveUrlService = new ResolveUrlService(shortUrlRepository, redisTemplate, clock);
     }
 
     @Test
@@ -43,6 +49,7 @@ class ResolveUrlServiceTest {
         // Given
         String code = "abc123";
         String longUrl = "https://www.example.com";
+        LocalDateTime fixedTime = LocalDateTime.of(2024, 1, 1, 12, 0, 0);
         
         ShortUrl shortUrl = ShortUrl.builder()
                 .id(1L)
@@ -54,6 +61,8 @@ class ResolveUrlServiceTest {
 
         when(shortUrlRepository.findByCode(code)).thenReturn(Optional.of(shortUrl));
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(clock.instant()).thenReturn(fixedTime.toInstant(ZoneOffset.UTC));
+        when(clock.getZone()).thenReturn(ZoneOffset.UTC);
 
         // When
         String result = resolveUrlService.resolveUrl(code);

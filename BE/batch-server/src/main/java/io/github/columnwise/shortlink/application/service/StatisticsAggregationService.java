@@ -4,6 +4,7 @@ import io.github.columnwise.shortlink.application.port.in.AggregateStatisticsUse
 import io.github.columnwise.shortlink.application.port.out.RedisStatisticsReader;
 import io.github.columnwise.shortlink.application.port.out.StatisticsWriter;
 import io.github.columnwise.shortlink.application.port.out.UrlMetricsWriter;
+import io.github.columnwise.shortlink.domain.service.RedisKeyManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -114,7 +115,7 @@ public class StatisticsAggregationService implements AggregateStatisticsUseCase 
 
     private boolean isAlreadyProcessed(String code, LocalDate date) {
         try {
-            String processedKey = "batch:processed:" + code + ":" + date.format(DateTimeFormatter.ISO_LOCAL_DATE);
+            String processedKey = RedisKeyManager.getProcessedMarkerKey(code, date);
             return Boolean.TRUE.equals(redisTemplate.hasKey(processedKey));
         } catch (Exception e) {
             log.warn("Failed to check processed status for code: {}, date: {}", code, date, e);
@@ -144,19 +145,7 @@ public class StatisticsAggregationService implements AggregateStatisticsUseCase 
     }
 
     private String extractCodeFromAccessKey(String accessKey, LocalDate date) {
-        // url:access:count:ABC123:2024-01-01T14:30:45에서 ABC123 추출
-        String prefix = "url:access:count:";
-        
-        // prefix 이후 부분을 가져온다
-        String remaining = accessKey.substring(prefix.length());
-        
-        // 첫 번째 콜론까지가 코드
-        int colonIndex = remaining.indexOf(':');
-        if (colonIndex == -1) {
-            // 콜론이 없으면 전체가 코드 (타임스탬프가 없는 경우)
-            return remaining;
-        }
-        
-        return remaining.substring(0, colonIndex);
+        // RedisKeyManager를 사용하여 일관된 키 파싱
+        return RedisKeyManager.extractCodeFromKey(accessKey);
     }
 }
