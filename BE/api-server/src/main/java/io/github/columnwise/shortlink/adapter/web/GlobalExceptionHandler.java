@@ -1,6 +1,7 @@
 package io.github.columnwise.shortlink.adapter.web;
 
 import io.github.columnwise.shortlink.domain.exception.UrlNotFoundException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -13,6 +14,7 @@ import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -37,17 +39,19 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleIllegalArgumentException(IllegalArgumentException ex) {
+        log.warn("[400] IllegalArgumentException", ex);
         Map<String, String> error = new HashMap<>();
         error.put("error", "BAD_REQUEST");
-        error.put("message", ex.getMessage());
+        error.put("message", "Invalid request parameters");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<Map<String, String>> handleTypeMismatchException(MethodArgumentTypeMismatchException ex) {
+        log.warn("[400] MethodArgumentTypeMismatchException for parameter: {}", ex.getName(), ex);
         Map<String, String> error = new HashMap<>();
         error.put("error", "BAD_REQUEST");
-        error.put("message", "Invalid parameter format: " + ex.getName());
+        error.put("message", "Invalid parameter format");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 

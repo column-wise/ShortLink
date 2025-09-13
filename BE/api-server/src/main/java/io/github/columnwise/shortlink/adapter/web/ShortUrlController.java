@@ -111,7 +111,7 @@ public class ShortUrlController {
 		),
 		@ApiResponse(
 			responseCode = "400",
-			description = "잘못된 요청 (잘못된 날짜 형식 또는 시작일이 종료일보다 늦은 경우)"
+			description = "잘못된 요청 (잘못된 날짜 형식 또는 날짜 범위 오류)"
 		),
 		@ApiResponse(
 			responseCode = "404",
