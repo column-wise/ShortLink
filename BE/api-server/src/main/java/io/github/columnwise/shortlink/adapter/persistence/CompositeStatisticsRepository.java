@@ -1,9 +1,14 @@
 package io.github.columnwise.shortlink.adapter.persistence;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.columnwise.shortlink.application.port.out.StatisticsRepository;
 import io.github.columnwise.shortlink.domain.model.DailyStatistics;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -11,11 +16,14 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @Repository
 @RequiredArgsConstructor
 public class CompositeStatisticsRepository implements StatisticsRepository {
     
-    private final RedisTemplate<String, String> redisTemplate;
+    private final RedisTemplate<String, String> stringRedisTemplate;
+    private final RedisTemplate<String, Object> objectRedisTemplate;
+    private final ObjectMapper objectMapper;
     
     @Override
     public List<DailyStatistics> getDailyStatistics(String code, LocalDate startDate, LocalDate endDate) {
@@ -38,15 +46,16 @@ public class CompositeStatisticsRepository implements StatisticsRepository {
     
     private List<DailyStatistics> getCachedStatistics(String cacheKey) {
         try {
-            // 캐시된 통계가 있는지 확인 (간단히 존재 여부만 체크)
-            Boolean exists = redisTemplate.hasKey(cacheKey);
-            if (Boolean.TRUE.equals(exists)) {
-                // 실제 구현에서는 JSON 직렬화된 데이터를 역직렬화해야 함
-                // 현재는 캐시 로직만 구조적으로 구현
-                return null; // 임시로 null 반환
+            Object cached = objectRedisTemplate.opsForValue().get(cacheKey);
+            if (cached != null) {
+                if (cached instanceof String jsonString) {
+                    return objectMapper.readValue(jsonString, new TypeReference<List<DailyStatistics>>() {});
+                } else if (cached instanceof List<?> list) {
+                    return objectMapper.convertValue(list, new TypeReference<List<DailyStatistics>>() {});
+                }
             }
         } catch (Exception e) {
-            // 캐시 조회 실패 시 로그만 남기고 계속 진행
+            log.warn("Failed to retrieve cached statistics for key: {}", cacheKey, e);
         }
         return null;
     }
@@ -76,27 +85,37 @@ public class CompositeStatisticsRepository implements StatisticsRepository {
     
     private void cacheStatistics(String cacheKey, List<DailyStatistics> statistics, long timeout, java.util.concurrent.TimeUnit unit) {
         try {
-            // 통계 결과를 캐시에 저장 (간단히 존재 마킹만)
-            redisTemplate.opsForValue().set(cacheKey, "cached", timeout, unit);
+            String jsonValue = objectMapper.writeValueAsString(statistics);
+            objectRedisTemplate.opsForValue().set(cacheKey, jsonValue, timeout, unit);
+            log.debug("Cached statistics for key: {} with {} entries", cacheKey, statistics.size());
         } catch (Exception e) {
-            // 캐시 저장 실패 시 로그만 남기고 계속 진행
+            log.warn("Failed to cache statistics for key: {}", cacheKey, e);
         }
     }
     
     @Override
     public long getAccessCountForDate(String code, LocalDate date) {
-        // 해당 날짜에 해당하는 모든 방문 키를 찾아서 카운트
         String pattern = "url:access:count:" + code + ":*";
-        java.util.Set<String> keys = redisTemplate.keys(pattern);
+        String targetDatePrefix = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
         
-        if (keys == null || keys.isEmpty()) {
-            return 0L;
+        ScanOptions scanOptions = ScanOptions.scanOptions()
+                .match(pattern)
+                .count(100)
+                .build();
+        
+        long count = 0;
+        try (Cursor<String> cursor = stringRedisTemplate.scan(scanOptions)) {
+            while (cursor.hasNext()) {
+                String key = cursor.next();
+                if (key.contains(targetDatePrefix)) {
+                    count++;
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to scan Redis keys for pattern: {}", pattern, e);
         }
         
-        String targetDatePrefix = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
-        return keys.stream()
-                .filter(key -> key.contains(targetDatePrefix))
-                .count();
+        return count;
     }
     
     private long estimateUniqueVisitors(long accessCount) {
