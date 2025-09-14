@@ -116,7 +116,7 @@ class ShortUrlIntegrationTest {
                 .andExpect(status().isNotFound());
 
         mockMvc.perform(get("/api/v1/urls/" + nonExistentCode + "/stats"))
-                .andExpect(status().isOk());
+                .andExpect(status().isNotFound());
     }
 
     @Test
