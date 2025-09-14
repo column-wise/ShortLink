@@ -21,6 +21,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -129,7 +130,7 @@ class ShortUrlControllerTest {
                         .build()
         );
 
-        when(getStatsUseCase.getDailyStatistics(eq(code), eq(null), eq(null))).thenReturn(mockStats);
+        when(getStatsUseCase.getDailyStatistics(eq(code), any(LocalDate.class), any(LocalDate.class))).thenReturn(mockStats);
 
         // When & Then
         mockMvc.perform(get("/api/v1/urls/" + code + "/stats"))
@@ -146,7 +147,7 @@ class ShortUrlControllerTest {
         // Given
         String code = "notfound";
 
-        when(getStatsUseCase.getDailyStatistics(eq(code), eq(null), eq(null)))
+        when(getStatsUseCase.getDailyStatistics(eq(code), any(LocalDate.class), any(LocalDate.class)))
                 .thenThrow(new UrlNotFoundException("URL not found for code: " + code));
 
         // When & Then
