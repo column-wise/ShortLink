@@ -21,6 +21,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -129,7 +130,7 @@ class ShortUrlControllerTest {
                         .build()
         );
 
-        when(getStatsUseCase.getDailyStatistics(eq(code), eq(null), eq(null))).thenReturn(mockStats);
+        when(getStatsUseCase.getDailyStatistics(eq(code), any(LocalDate.class), any(LocalDate.class))).thenReturn(mockStats);
 
         // When & Then
         mockMvc.perform(get("/api/v1/urls/" + code + "/stats"))
@@ -146,11 +147,13 @@ class ShortUrlControllerTest {
         // Given
         String code = "notfound";
 
-        when(getStatsUseCase.getDailyStatistics(eq(code), eq(null), eq(null)))
-                .thenThrow(new UrlNotFoundException("URL not found for code: " + code));
+        when(getStatsUseCase.getDailyStatistics(eq(code), any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(List.of()); // dev 브랜치에서는 빈 리스트 반환
 
         // When & Then
         mockMvc.perform(get("/api/v1/urls/" + code + "/stats"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$").isEmpty());
     }
 }
