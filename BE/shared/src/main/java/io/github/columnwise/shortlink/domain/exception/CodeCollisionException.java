@@ -4,4 +4,8 @@ public class CodeCollisionException extends RuntimeException {
 	public CodeCollisionException(String message) {
 		super(message);
 	}
+
+	public CodeCollisionException(String message, Throwable cause) {
+		super(message, cause);
+	}
 }
