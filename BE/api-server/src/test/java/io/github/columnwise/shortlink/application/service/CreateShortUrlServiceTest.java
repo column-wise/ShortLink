@@ -1,6 +1,7 @@
 package io.github.columnwise.shortlink.application.service;
 
 import io.github.columnwise.shortlink.application.port.out.ShortUrlRepositoryPort;
+import io.github.columnwise.shortlink.domain.exception.CodeCollisionException;
 import io.github.columnwise.shortlink.domain.model.ShortUrl;
 import io.github.columnwise.shortlink.domain.service.CodeGenerator;
 import org.junit.jupiter.api.BeforeEach;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -152,7 +154,7 @@ class CreateShortUrlServiceTest {
 
         // When & Then
         assertThatThrownBy(() -> createShortUrlService.createShortUrl(longUrl))
-                .isInstanceOf(RuntimeException.class)
+                .isInstanceOf(CodeCollisionException.class)
                 .hasMessageContaining("Failed to generate unique code");
         
         verify(codeGenerator, times(5)).generate(anyString());
@@ -182,7 +184,7 @@ class CreateShortUrlServiceTest {
         when(shortUrlRepository.findByCode(firstCode)).thenReturn(Optional.empty());
         when(shortUrlRepository.findByCode(secondCode)).thenReturn(Optional.empty());
         when(shortUrlRepository.save(any(ShortUrl.class)))
-                .thenThrow(new RuntimeException("DB error"))
+                .thenThrow(new DataIntegrityViolationException("Duplicate key constraint violation"))
                 .thenReturn(savedUrl);
 
         // When
