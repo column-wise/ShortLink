@@ -1,8 +1,10 @@
 package io.github.columnwise.shortlink.config;
 
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Positive;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
+import org.springframework.validation.annotation.Validated;
 
 /**
  * URL 단축 서비스 관련 설정 프로퍼티
@@ -15,18 +17,28 @@ import org.springframework.stereotype.Component;
  * app.shorturl.max-retries=5
  * app.shorturl.default-expiration-days=365
  * </pre>
+ *
+ * <p>모든 설정값은 Bean Validation을 통해 검증됩니다.</p>
  */
 @Data
+@Validated
 @ConfigurationProperties(prefix = "app.shorturl")
 public class ShortUrlProperties {
 
     /**
      * 코드 생성 시 최대 재시도 횟수
+     *
+     * <p>1 이상의 값이어야 합니다. 너무 높은 값은 성능에 영향을 줄 수 있으므로
+     * 적절한 범위(1-10)에서 설정하는 것을 권장합니다.</p>
      */
+    @Min(value = 1, message = "maxRetries must be at least 1")
     private int maxRetries = 5;
 
     /**
      * URL 기본 만료 기간 (일)
+     *
+     * <p>양수 값이어야 합니다. 일반적으로 30일에서 365일 사이의 값을 권장합니다.</p>
      */
+    @Positive(message = "defaultExpirationDays must be positive")
     private long defaultExpirationDays = 365;
 }

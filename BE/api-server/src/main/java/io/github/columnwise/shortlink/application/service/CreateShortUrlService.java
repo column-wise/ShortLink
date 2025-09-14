@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -56,58 +57,129 @@ public class CreateShortUrlService implements CreateShortUrlUseCase {
      * @throws RuntimeException 예상치 못한 오류가 발생한 경우
      */
     @Override
-    @Transactional
+    @Transactional(readOnly = true)
     public ShortUrl createShortUrl(String longUrl) {
-        log.debug("Creating short URL for: {}", longUrl);
+        String maskedUrl = maskUrl(longUrl);
+        log.debug("Creating short URL for: {}", maskedUrl);
 
         // 기존 URL이 있으면 반환
         Optional<ShortUrl> existing = shortUrlRepository.findByLongUrl(longUrl);
         if (existing.isPresent()) {
-            log.debug("Found existing short URL: {} for {}", existing.get().code(), longUrl);
+            log.debug("Found existing short URL: {} for {}", existing.get().code(), maskedUrl);
             return existing.get();
         }
-        
+
         // 코드 충돌 방지를 위한 재시도 로직
         int maxRetries = properties.getMaxRetries();
-        log.debug("Starting code generation with max {} retries", maxRetries);
+        log.debug("Starting code generation with max {} retries for {}", maxRetries, maskedUrl);
 
         for (int i = 0; i < maxRetries; i++) {
             String code = codeGenerator.generate(longUrl + "_" + i); // salt 추가
-            log.debug("Generated code: {} (attempt {}/{})", code, i + 1, maxRetries);
+            log.debug("Generated code: {} (attempt {}/{}) for {}", code, i + 1, maxRetries, maskedUrl);
 
-            // 코드 중복 확인
-            if (shortUrlRepository.findByCode(code).isEmpty()) {
-                Instant now = clock.instant();
-                ShortUrl shortUrl = ShortUrl.builder()
-                        .code(code)
-                        .longUrl(longUrl)
-                        .createdAt(now)
-                        .expiresAt(now.plus(properties.getDefaultExpirationDays(), ChronoUnit.DAYS))
-                        .build();
-                        
-                try {
-                    ShortUrl savedUrl = shortUrlRepository.save(shortUrl);
-                    log.info("Successfully created short URL: {} for {}", code, longUrl);
-                    return savedUrl;
-                } catch (DataIntegrityViolationException e) {
-                    // 데이터베이스 제약 위반 (중복 코드) - 재시도
-                    log.warn("Database constraint violation for code: {} (attempt {}/{})", code, i + 1, maxRetries);
+            try {
+                ShortUrl savedUrl = saveWithNewTransaction(longUrl, code, i + 1, maxRetries);
+                log.info("Successfully created short URL: {} for {} after {} attempts", code, maskedUrl, i + 1);
+                return savedUrl;
+            } catch (DataIntegrityViolationException e) {
+                if (isUniqueCodeConstraintViolation(e)) {
+                    log.warn("Unique code constraint violation for code: {} (attempt {}/{}) for {}",
+                            code, i + 1, maxRetries, maskedUrl);
                     if (i == maxRetries - 1) {
-                        log.error("Failed to generate unique code after {} attempts for URL: {}", maxRetries, longUrl);
-                        throw new CodeCollisionException("Failed to generate unique code after " + maxRetries + " attempts due to database constraint violation", e);
+                        log.error("Failed to generate unique code after {} attempts for {}", maxRetries, maskedUrl);
+                        throw new CodeCollisionException("Failed to generate unique code after " + maxRetries + " attempts due to unique constraint violation", e);
                     }
                     // 다음 반복에서 재시도
-                } catch (Exception e) {
-                    // 예상치 못한 오류는 즉시 실패
-                    log.error("Unexpected error while saving short URL for: {}", longUrl, e);
-                    throw new RuntimeException("Unexpected error occurred while saving short URL", e);
+                } else {
+                    // 다른 제약 위반은 재시도하지 않음
+                    log.error("Non-recoverable constraint violation for code: {} for {}", code, maskedUrl, e);
+                    throw new RuntimeException("Database constraint violation that cannot be resolved by retry", e);
                 }
-            } else {
-                log.debug("Code collision detected for: {}, retrying...", code);
+            } catch (Exception e) {
+                // 예상치 못한 오류는 즉시 실패
+                log.error("Unexpected error while saving short URL for: {}", maskedUrl, e);
+                throw new RuntimeException("Unexpected error occurred while saving short URL", e);
             }
         }
-        
-        log.error("Exhausted all {} retry attempts for URL: {}", maxRetries, longUrl);
+
+        log.error("Exhausted all {} retry attempts for {}", maxRetries, maskedUrl);
         throw new CodeCollisionException("Failed to generate unique code after exhausting all retry attempts");
+    }
+
+    /**
+     * 새로운 트랜잭션에서 ShortUrl을 저장합니다.
+     *
+     * <p>각 저장 시도를 독립적인 트랜잭션으로 실행하여 rollback-only 상태를 방지합니다.</p>
+     *
+     * @param longUrl 원본 URL
+     * @param code 생성된 단축 코드
+     * @param attempt 현재 시도 번호
+     * @param maxRetries 최대 재시도 횟수
+     * @return 저장된 ShortUrl 객체
+     * @throws DataIntegrityViolationException 데이터베이스 제약 위반 시
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public ShortUrl saveWithNewTransaction(String longUrl, String code, int attempt, int maxRetries) {
+        // 실제 저장 전 한번 더 중복 확인 (동시성 대응)
+        if (shortUrlRepository.findByCode(code).isPresent()) {
+            throw new DataIntegrityViolationException("Code already exists: " + code);
+        }
+
+        Instant now = clock.instant();
+        ShortUrl shortUrl = ShortUrl.builder()
+                .code(code)
+                .longUrl(longUrl)
+                .createdAt(now)
+                .expiresAt(now.plus(properties.getDefaultExpirationDays(), ChronoUnit.DAYS))
+                .build();
+
+        return shortUrlRepository.save(shortUrl);
+    }
+
+    /**
+     * 데이터베이스 제약 위반이 고유 코드 제약 위반인지 확인합니다.
+     *
+     * @param e DataIntegrityViolationException
+     * @return 고유 코드 제약 위반 여부
+     */
+    private boolean isUniqueCodeConstraintViolation(DataIntegrityViolationException e) {
+        String message = e.getMessage();
+        if (message == null) {
+            return false;
+        }
+
+        // 일반적인 unique constraint violation 패턴 확인
+        String lowerMessage = message.toLowerCase();
+        return lowerMessage.contains("unique") ||
+               lowerMessage.contains("duplicate") ||
+               lowerMessage.contains("code already exists");
+    }
+
+    /**
+     * 로깅용 URL 마스킹 처리
+     *
+     * <p>보안상 민감할 수 있는 URL 정보를 마스킹하여 로그에 기록합니다.</p>
+     *
+     * @param url 원본 URL
+     * @return 마스킹된 URL
+     */
+    private String maskUrl(String url) {
+        if (url == null || url.length() <= 10) {
+            return url;
+        }
+
+        // 프로토콜과 도메인은 유지하고 경로는 마스킹
+        int protocolEnd = url.indexOf("://");
+        if (protocolEnd == -1) {
+            return url.substring(0, 10) + "***";
+        }
+
+        int pathStart = url.indexOf("/", protocolEnd + 3);
+        if (pathStart == -1) {
+            return url; // 경로가 없으면 그대로 반환
+        }
+
+        String baseUrl = url.substring(0, pathStart);
+        return baseUrl + "/***";
     }
 }
