@@ -11,11 +11,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.annotation.Propagation;
 
+import java.sql.SQLException;
+import java.sql.SQLIntegrityConstraintViolationException;
 import java.time.Clock;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 
 /**
@@ -41,6 +40,7 @@ public class CreateShortUrlService implements CreateShortUrlUseCase {
     private final CodeGenerator codeGenerator;
     private final ShortUrlProperties properties;
     private final Clock clock;
+    private final ShortUrlTxSaver txSaver;
     
     /**
      * 긴 URL을 단축 코드로 변환합니다.
@@ -78,7 +78,7 @@ public class CreateShortUrlService implements CreateShortUrlUseCase {
             log.debug("Generated code: {} (attempt {}/{}) for {}", code, i + 1, maxRetries, maskedUrl);
 
             try {
-                ShortUrl savedUrl = saveWithNewTransaction(longUrl, code, i + 1, maxRetries);
+                ShortUrl savedUrl = txSaver.saveWithNewTx(longUrl, code);
                 log.info("Successfully created short URL: {} for {} after {} attempts", code, maskedUrl, i + 1);
                 return savedUrl;
             } catch (DataIntegrityViolationException e) {
@@ -106,53 +106,43 @@ public class CreateShortUrlService implements CreateShortUrlUseCase {
         throw new CodeCollisionException("Failed to generate unique code after exhausting all retry attempts");
     }
 
-    /**
-     * 새로운 트랜잭션에서 ShortUrl을 저장합니다.
-     *
-     * <p>각 저장 시도를 독립적인 트랜잭션으로 실행하여 rollback-only 상태를 방지합니다.</p>
-     *
-     * @param longUrl 원본 URL
-     * @param code 생성된 단축 코드
-     * @param attempt 현재 시도 번호
-     * @param maxRetries 최대 재시도 횟수
-     * @return 저장된 ShortUrl 객체
-     * @throws DataIntegrityViolationException 데이터베이스 제약 위반 시
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public ShortUrl saveWithNewTransaction(String longUrl, String code, int attempt, int maxRetries) {
-        // 실제 저장 전 한번 더 중복 확인 (동시성 대응)
-        if (shortUrlRepository.findByCode(code).isPresent()) {
-            throw new DataIntegrityViolationException("Code already exists: " + code);
-        }
-
-        Instant now = clock.instant();
-        ShortUrl shortUrl = ShortUrl.builder()
-                .code(code)
-                .longUrl(longUrl)
-                .createdAt(now)
-                .expiresAt(now.plus(properties.getDefaultExpirationDays(), ChronoUnit.DAYS))
-                .build();
-
-        return shortUrlRepository.save(shortUrl);
-    }
 
     /**
      * 데이터베이스 제약 위반이 고유 코드 제약 위반인지 확인합니다.
+     *
+     * <p>SQLState 코드와 표준 예외 타입을 우선적으로 확인하여 보다 정확한 판별을 수행합니다.
+     * 문자열 매칭은 보조적으로만 사용하여 벤더별 메시지 차이에 대응합니다.</p>
      *
      * @param e DataIntegrityViolationException
      * @return 고유 코드 제약 위반 여부
      */
     private boolean isUniqueCodeConstraintViolation(DataIntegrityViolationException e) {
-        String message = e.getMessage();
-        if (message == null) {
-            return false;
+        // 1. SQLState 및 표준 예외 타입으로 우선 확인
+        Throwable rootCause = e.getRootCause();
+        if (rootCause instanceof SQLException sqlException) {
+            String sqlState = sqlException.getSQLState();
+            // PostgreSQL, H2: 23505 (unique_violation)
+            if ("23505".equals(sqlState)) {
+                return true;
+            }
+            // MySQL: 에러 코드 1062 (ER_DUP_ENTRY)
+            if (sqlException.getErrorCode() == 1062) {
+                return true;
+            }
+            // 표준 SQL 무결성 제약 위반 예외
+            if (sqlException instanceof SQLIntegrityConstraintViolationException) {
+                return true;
+            }
         }
 
-        // 일반적인 unique constraint violation 패턴 확인
-        String lowerMessage = message.toLowerCase();
-        return lowerMessage.contains("unique") ||
-               lowerMessage.contains("duplicate") ||
-               lowerMessage.contains("code already exists");
+        // 2. 메시지 기반 폴백 확인 (벤더별 차이 대응)
+        String message = Optional.ofNullable(e.getMessage())
+                .map(String::toLowerCase)
+                .orElse("");
+        return message.contains("unique") ||
+               message.contains("duplicate") ||
+               message.contains("duplicate key") ||
+               message.contains("code already exists");
     }
 
     /**
