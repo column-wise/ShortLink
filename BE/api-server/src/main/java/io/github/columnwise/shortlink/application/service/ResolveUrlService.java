@@ -4,6 +4,7 @@ import io.github.columnwise.shortlink.application.port.in.ResolveUrlUseCase;
 import io.github.columnwise.shortlink.application.port.out.ShortUrlRepositoryPort;
 import io.github.columnwise.shortlink.config.ShortUrlProperties;
 import io.github.columnwise.shortlink.domain.service.RedisKeyManager;
+import io.github.columnwise.shortlink.util.HashUtils;
 import org.springframework.data.redis.core.RedisTemplate;
 import io.github.columnwise.shortlink.domain.exception.UrlNotFoundException;
 import io.github.columnwise.shortlink.domain.model.ShortUrl;
@@ -11,9 +12,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 
 /**
  * URL 해석 서비스 구현체
@@ -41,19 +42,19 @@ public class ResolveUrlService implements ResolveUrlUseCase {
      * 단축 코드를 통해 원본 URL을 조회하고 방문을 기록합니다.
      *
      * <p>주어진 단축 코드에 해당하는 원본 URL을 데이터베이스에서 조회하고,
-     * Redis에 방문 기록을 타임스탬프와 함께 저장합니다.</p>
+     * Redis에 방문 기록을 저장합니다.</p>
      *
      * @param code 단축 코드
      * @return 원본 URL
      * @throws UrlNotFoundException 해당 코드에 대한 URL이 존재하지 않는 경우
      */
     @Override
-    public String resolveUrl(String code) {
+    public String resolveUrl(String code, String ip, String uaFamily, String deviceType) {
         ShortUrl shortUrl = shortUrlRepository.findByCode(code)
                 .orElseThrow(() -> new UrlNotFoundException("URL not found for code: " + code));
         
         // Redis에 타임스탬프 기반 방문 기록 저장
-        recordVisit(code);
+        recordVisit(code, ip, uaFamily, deviceType);
         
         return shortUrl.longUrl();
     }
@@ -61,22 +62,46 @@ public class ResolveUrlService implements ResolveUrlUseCase {
     /**
      * 방문 기록을 Redis에 저장합니다.
      *
-     * <p>현재 시간을 기반으로 타임스탬프 키를 생성하여 방문을 기록합니다.
-     * 각 방문은 개별 키로 저장되어 나중에 batch-server에서 통계 집계 시 활용됩니다.
-     * 키 존재 자체가 방문을 의미하므로 값은 상관없이 "1"로 설정합니다.</p>
+     * <p>현재 시간을 기반으로 키를 생성하여 방문을 기록합니다.
+     * 코드 별 방문 정보는 key hour count 형태로 Hash에 저장됩니다.</p>
      *
      * @param code 방문된 단축 코드
      */
-    private void recordVisit(String code) {
-        LocalDateTime now = LocalDateTime.now(clock);
-        String timestamp = now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+    private void recordVisit(String code, String ip, String uaFamily, String deviceType) {
+        LocalDate today = LocalDate.now(clock);
+        int hour = LocalDateTime.now(clock).getHour();
 
-        // 개별 타임스탬프 키로 저장 (batch-server가 키 개수를 세어서 통계 생성)
-        String accessKey = "url:access:count:" + code + ":" + timestamp;
+        String visitorHash = HashUtils.sha256(ip + "|" + uaFamily);
 
-        // 해당 키에 값을 설정 (값은 1로 고정, 키 존재 자체가 방문을 의미)
-        // TTL 설정으로 자동 정리 (batch-server가 처리할 수 있는 기간만큼 보관)
-        redisTemplate.opsForValue().set(accessKey, "1",
-            java.time.Duration.ofDays(properties.getVisitStatisticsTtlDays()));
+        String hourlyKey  = RedisKeyManager.getHourlyAccessKey(code, today);
+        String uniqueKey  = RedisKeyManager.getDailyUniqueKey(code, today);
+        String uaKey      = RedisKeyManager.getDailyUaKey(code, today);
+        String deviceKey  = RedisKeyManager.getDailyDeviceKey(code, today);
+
+        // 시간대별
+        redisTemplate.opsForHash().increment(hourlyKey, String.format("%02d", hour), 1);
+
+        // 고유 방문자
+        redisTemplate.opsForHyperLogLog().add(uniqueKey, visitorHash);
+
+        // 브라우저
+        redisTemplate.opsForHash().increment(uaKey, uaFamily, 1);
+
+        // 디바이스
+        redisTemplate.opsForHash().increment(deviceKey, deviceType, 1);
+
+        // TTL은 키 최초 생성 시만
+        if (Boolean.FALSE.equals(redisTemplate.hasKey(hourlyKey))) {
+            redisTemplate.expire(hourlyKey, Duration.ofDays(2));
+        }
+        if (Boolean.FALSE.equals(redisTemplate.hasKey(uniqueKey))) {
+            redisTemplate.expire(uniqueKey, Duration.ofDays(2));
+        }
+        if (Boolean.FALSE.equals(redisTemplate.hasKey(uaKey))) {
+            redisTemplate.expire(uaKey, Duration.ofDays(2));
+        }
+        if (Boolean.FALSE.equals(redisTemplate.hasKey(deviceKey))) {
+            redisTemplate.expire(deviceKey, Duration.ofDays(2));
+        }
     }
 }
