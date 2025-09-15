@@ -1,5 +1,5 @@
 package io.github.columnwise.shortlink.application.port.in;
 
 public interface ResolveUrlUseCase {
-    String resolveUrl(String code);
+    String resolveUrl(String code, String ip, String uaFamily, String deviceType);
 }
