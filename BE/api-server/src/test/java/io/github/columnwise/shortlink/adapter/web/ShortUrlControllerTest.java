@@ -7,7 +7,7 @@ import io.github.columnwise.shortlink.application.port.in.GetStatsUseCase;
 import io.github.columnwise.shortlink.application.port.in.ResolveUrlUseCase;
 import io.github.columnwise.shortlink.domain.exception.UrlNotFoundException;
 import io.github.columnwise.shortlink.domain.model.ShortUrl;
-import io.github.columnwise.shortlink.domain.model.DailyStatistics;
+import io.github.columnwise.shortlink.domain.model.UrlMetrics;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,8 +18,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
-import java.time.LocalDate;
-import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -94,7 +92,7 @@ class ShortUrlControllerTest {
         String code = "abc123";
         String longUrl = "https://www.example.com";
 
-        when(resolveUrlUseCase.resolveUrl(eq(code))).thenReturn(longUrl);
+        when(resolveUrlUseCase.resolveUrl(eq(code), any(String.class), any(String.class), any(String.class))).thenReturn(longUrl);
 
         // When & Then
         mockMvc.perform(get("/api/v1/r/" + code))
@@ -108,7 +106,7 @@ class ShortUrlControllerTest {
         // Given
         String code = "notfound";
 
-        when(resolveUrlUseCase.resolveUrl(eq(code)))
+        when(resolveUrlUseCase.resolveUrl(eq(code), any(String.class), any(String.class), any(String.class)))
                 .thenThrow(new UrlNotFoundException("URL not found for code: " + code));
 
         // When & Then
@@ -117,43 +115,21 @@ class ShortUrlControllerTest {
     }
 
     @Test
-    @DisplayName("통계 조회 성공")
-    void getDailyStatistics_Success() throws Exception {
+    @DisplayName("URL 메트릭 조회 성공")
+    void getUrlMetrics_Success() throws Exception {
         // Given
         String code = "abc123";
-        List<DailyStatistics> mockStats = List.of(
-                DailyStatistics.builder()
-                        .code(code)
-                        .date(LocalDate.of(2024, 1, 1))
-                        .accessCount(25)
-                        .uniqueVisitors(18)
-                        .build()
-        );
+        UrlMetrics mockMetrics = UrlMetrics.builder()
+                .code(code)
+                .totalAccesses(150L)
+                .build();
 
-        when(getStatsUseCase.getDailyStatistics(eq(code), any(LocalDate.class), any(LocalDate.class))).thenReturn(mockStats);
+        when(getStatsUseCase.getUrlMetrics(eq(code))).thenReturn(mockMetrics);
 
         // When & Then
-        mockMvc.perform(get("/api/v1/urls/" + code + "/stats"))
+        mockMvc.perform(get("/api/v1/urls/" + code + "/metrics"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray())
-                .andExpect(jsonPath("$[0].code").value(code))
-                .andExpect(jsonPath("$[0].accessCount").value(25))
-                .andExpect(jsonPath("$[0].uniqueVisitors").value(18));
-    }
-
-    @Test
-    @DisplayName("존재하지 않는 코드의 통계 조회")
-    void getDailyStatistics_NotFound() throws Exception {
-        // Given
-        String code = "notfound";
-
-        when(getStatsUseCase.getDailyStatistics(eq(code), any(LocalDate.class), any(LocalDate.class)))
-                .thenReturn(List.of()); // dev 브랜치에서는 빈 리스트 반환
-
-        // When & Then
-        mockMvc.perform(get("/api/v1/urls/" + code + "/stats"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray())
-                .andExpect(jsonPath("$").isEmpty());
+                .andExpect(jsonPath("$.code").value(code))
+                .andExpect(jsonPath("$.totalAccesses").value(150));
     }
 }

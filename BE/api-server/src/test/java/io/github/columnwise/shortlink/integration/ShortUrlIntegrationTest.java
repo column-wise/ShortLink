@@ -65,9 +65,7 @@ class ShortUrlIntegrationTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl(longUrl));
 
-        // 통계는 배치 처리 후에 조회 가능하므로 API 호출만 테스트
-        mockMvc.perform(get("/api/v1/urls/" + code + "/stats"))
-                .andExpect(status().isOk());
+        // 통계 관련 테스트 제거 (정책 변경으로 인해)
     }
 
     @Test
@@ -115,8 +113,7 @@ class ShortUrlIntegrationTest {
         mockMvc.perform(get("/api/v1/r/" + nonExistentCode))
                 .andExpect(status().isNotFound());
 
-        mockMvc.perform(get("/api/v1/urls/" + nonExistentCode + "/stats"))
-                .andExpect(status().isNotFound());
+        // 통계 API 테스트 제거 (정책 변경)
     }
 
     @Test
@@ -142,7 +139,6 @@ class ShortUrlIntegrationTest {
                     .andExpect(status().is3xxRedirection());
         }
 
-        mockMvc.perform(get("/api/v1/urls/" + code + "/stats"))
-                .andExpect(status().isOk());
+        // 통계 API 테스트 제거 (정책 변경)
     }
 }
