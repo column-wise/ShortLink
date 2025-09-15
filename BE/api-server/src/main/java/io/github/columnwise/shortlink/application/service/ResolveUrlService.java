@@ -14,6 +14,19 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
+/**
+ * URL 해석 서비스 구현체
+ *
+ * <p>단축 코드를 통해 원본 URL을 찾고 방문 기록을 저장하는 서비스입니다.
+ * Redis를 활용하여 실시간 방문 통계를 기록합니다.</p>
+ *
+ * <p>주요 기능:</p>
+ * <ul>
+ *   <li>단축 코드로 원본 URL 조회</li>
+ *   <li>방문 시간 기반 실시간 통계 기록</li>
+ *   <li>타임스탬프 기반 방문 로그 저장</li>
+ * </ul>
+ */
 @Service
 @RequiredArgsConstructor
 public class ResolveUrlService implements ResolveUrlUseCase {
@@ -22,6 +35,16 @@ public class ResolveUrlService implements ResolveUrlUseCase {
     private final RedisTemplate<String, String> redisTemplate;
     private final Clock clock;
     
+    /**
+     * 단축 코드를 통해 원본 URL을 조회하고 방문을 기록합니다.
+     *
+     * <p>주어진 단축 코드에 해당하는 원본 URL을 데이터베이스에서 조회하고,
+     * Redis에 방문 기록을 타임스탬프와 함께 저장합니다.</p>
+     *
+     * @param code 단축 코드
+     * @return 원본 URL
+     * @throws UrlNotFoundException 해당 코드에 대한 URL이 존재하지 않는 경우
+     */
     @Override
     public String resolveUrl(String code) {
         ShortUrl shortUrl = shortUrlRepository.findByCode(code)
@@ -33,6 +56,14 @@ public class ResolveUrlService implements ResolveUrlUseCase {
         return shortUrl.longUrl();
     }
     
+    /**
+     * 방문 기록을 Redis에 저장합니다.
+     *
+     * <p>현재 시간을 기반으로 타임스탬프 키를 생성하여 방문을 기록합니다.
+     * 각 방문은 개별 키로 저장되어 나중에 통계 집계 시 활용됩니다.</p>
+     *
+     * @param code 방문된 단축 코드
+     */
     private void recordVisit(String code) {
         LocalDateTime now = LocalDateTime.now(clock);
         LocalDate date = now.toLocalDate();

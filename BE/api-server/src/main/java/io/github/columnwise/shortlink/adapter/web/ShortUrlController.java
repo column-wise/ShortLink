@@ -32,6 +32,21 @@ import org.springframework.web.servlet.view.RedirectView;
 import java.time.LocalDate;
 import java.util.List;
 
+/**
+ * URL 단축 서비스 REST API 컴트롤러
+ *
+ * <p>URL 단축 서비스의 주요 기능을 REST API로 제공하는 컴트롤러입니다.
+ * Hexagonal Architecture에서 Web Adapter 역할을 담당하며, 외부 HTTP 요청을 도메인 서비스로 전달합니다.</p>
+ *
+ * <p>제공 기능:</p>
+ * <ul>
+ *   <li>URL 단축 생성 (POST /api/v1/urls)</li>
+ *   <li>URL 리다이렉트 (GET /api/v1/r/{code})</li>
+ *   <li>일별 접속 통계 조회 (GET /api/v1/urls/{code}/stats)</li>
+ * </ul>
+ *
+ * <p>OpenAPI/Swagger 문서화를 지원하며, Bean Validation을 통한 입력 검증을 수행합니다.</p>
+ */
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor

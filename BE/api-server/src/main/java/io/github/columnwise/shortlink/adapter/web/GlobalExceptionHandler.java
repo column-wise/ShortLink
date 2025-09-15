@@ -14,10 +14,31 @@ import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * 글로벌 예외 처리 핸들러
+ *
+ * <p>애플리케이션 전역에서 발생하는 예외를 처리하고 일관된 에러 응답을 제공합니다.
+ * 각 예외 유형에 따라 적절한 HTTP 상태 코드와 에러 메시지를 반환합니다.</p>
+ *
+ * <p>처리하는 예외 유형:</p>
+ * <ul>
+ *   <li>{@link UrlNotFoundException} - 404 Not Found</li>
+ *   <li>{@link MethodArgumentNotValidException} - 400 Bad Request (유효성 검증 실패)</li>
+ *   <li>{@link IllegalArgumentException} - 400 Bad Request (잘못된 인자)</li>
+ *   <li>{@link MethodArgumentTypeMismatchException} - 400 Bad Request (타입 불일치)</li>
+ *   <li>{@link Exception} - 500 Internal Server Error (기타 모든 예외)</li>
+ * </ul>
+ */
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    /**
+     * URL 조회 실패 예외를 처리합니다.
+     *
+     * @param ex UrlNotFoundException 예외
+     * @return 404 Not Found 응답
+     */
     @ExceptionHandler(UrlNotFoundException.class)
     public ResponseEntity<Map<String, String>> handleUrlNotFoundException(UrlNotFoundException ex) {
         Map<String, String> error = new HashMap<>();
@@ -26,6 +47,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
     }
 
+    /**
+     * 요청 데이터 유효성 검증 실패 예외를 처리합니다.
+     *
+     * @param ex MethodArgumentNotValidException 예외
+     * @return 400 Bad Request 응답 (필드별 유효성 오류 포함)
+     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> handleValidationException(MethodArgumentNotValidException ex) {
         Map<String, String> errors = new HashMap<>();
@@ -37,6 +64,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errors);
     }
 
+    /**
+     * 잘못된 인자 예외를 처리합니다.
+     *
+     * @param ex IllegalArgumentException 예외
+     * @return 400 Bad Request 응답
+     */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleIllegalArgumentException(IllegalArgumentException ex) {
         log.warn("[400] IllegalArgumentException", ex);
@@ -46,6 +79,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 
+    /**
+     * 메서드 인자 타입 불일치 예외를 처리합니다.
+     *
+     * @param ex MethodArgumentTypeMismatchException 예외
+     * @return 400 Bad Request 응답
+     */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<Map<String, String>> handleTypeMismatchException(MethodArgumentTypeMismatchException ex) {
         log.warn("[400] MethodArgumentTypeMismatchException for parameter: {}", ex.getName(), ex);
@@ -55,6 +94,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 
+    /**
+     * 처리되지 않은 모든 예외를 처리합니다.
+     *
+     * <p>예상하지 못한 시스템 오류에 대해 일반적인 500 에러 응답을 제공합니다.
+     * 보안상 내부 오류 세부사항은 노출하지 않습니다.</p>
+     *
+     * @param ex Exception 예외
+     * @return 500 Internal Server Error 응답
+     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleGenericException(Exception ex) {
         Map<String, String> error = new HashMap<>();
