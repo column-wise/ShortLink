@@ -46,11 +46,7 @@ public class UrlStatisticsEntity {
     protected void onUpdate() {
         this.updatedAt = Instant.now();
     }
-    
-    public void incrementAccessCount(long increment) {
-        this.totalAccessCount = (this.totalAccessCount != null ? this.totalAccessCount : 0) + increment;
-    }
-    
+
     public void updateLastAccessTime(Instant accessTime) {
         this.lastAccessedAt = accessTime;
     }
