@@ -25,18 +25,21 @@ public class RedisStatisticsReaderAdapter implements RedisStatisticsReader {
 
     @Override
     public Set<String> findAccessCountKeys(LocalDate date) {
+        // 개별 타임스탬프 키 패턴으로 스캔 (API 서버가 생성한 키들)
         String pattern = ACCESS_COUNT_KEY_PREFIX + "*";
         String targetDatePrefix = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
-        
+
         ScanOptions scanOptions = ScanOptions.scanOptions()
                 .match(pattern)
                 .count(1000)
                 .build();
-        
+
         Set<String> matchingKeys = new HashSet<>();
         try (Cursor<String> cursor = redisTemplate.scan(scanOptions)) {
             while (cursor.hasNext()) {
                 String key = cursor.next();
+                // 키가 특정 날짜의 타임스탬프를 포함하는지 확인
+                // 예: url:access:count:abc123:2024-01-01T12:34:56
                 if (key.contains(targetDatePrefix)) {
                     matchingKeys.add(key);
                 }
@@ -45,7 +48,7 @@ public class RedisStatisticsReaderAdapter implements RedisStatisticsReader {
             log.error("Failed to scan access count keys for date: {}", date, e);
             return Collections.emptySet();
         }
-        
+
         log.debug("Found {} access count keys for date: {}", matchingKeys.size(), date);
         return matchingKeys;
     }

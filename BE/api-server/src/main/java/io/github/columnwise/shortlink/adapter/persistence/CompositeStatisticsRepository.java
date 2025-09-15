@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Repository
@@ -27,121 +28,89 @@ public class CompositeStatisticsRepository implements StatisticsRepository {
     
     @Override
     public List<DailyStatistics> getDailyStatistics(String code, LocalDate startDate, LocalDate endDate) {
-        // 먼저 Redis 캐시에서 통계 조회 시도
-        String cacheKey = "stats:" + code + ":" + startDate + ":" + endDate;
-        List<DailyStatistics> cachedStats = getCachedStatistics(cacheKey);
-        
-        if (cachedStats != null && !cachedStats.isEmpty()) {
-            return cachedStats;
-        }
-        
-        // 캐시 미스: 실시간으로 Redis 방문 키들을 조회해서 계산
-        List<DailyStatistics> result = calculateRealTimeStatistics(code, startDate, endDate);
-        
-        // 결과를 캐시에 저장 (5분 TTL)
-        cacheStatistics(cacheKey, result, 5, java.util.concurrent.TimeUnit.MINUTES);
-        
-        return result;
+        // batch-server가 만든 통계 캐시에서 조회
+        List<DailyStatistics> result = getBatchProcessedStatistics(code, startDate, endDate);
+
+        // 캐시가 없으면 빈 리스트 반환 (실시간 계산 안함)
+        return result != null ? result : new ArrayList<>();
     }
-    
-    private List<DailyStatistics> getCachedStatistics(String cacheKey) {
-        try {
-            Object cached = objectRedisTemplate.opsForValue().get(cacheKey);
-            if (cached != null) {
-                if (cached instanceof String jsonString) {
-                    return objectMapper.readValue(jsonString, new TypeReference<List<DailyStatistics>>() {});
-                } else if (cached instanceof List<?> list) {
-                    return objectMapper.convertValue(list, new TypeReference<List<DailyStatistics>>() {});
-                }
-            }
-        } catch (Exception e) {
-            log.warn("Failed to retrieve cached statistics for key: {}", cacheKey, e);
-        }
-        return null;
-    }
-    
-    private List<DailyStatistics> calculateRealTimeStatistics(String code, LocalDate startDate, LocalDate endDate) {
+
+    /**
+     * batch-server가 처리한 통계 캐시를 조회합니다.
+     *
+     * <p>batch-server가 주기적으로 원시 방문 데이터를 집계해서 만든 통계 캐시를 조회합니다.
+     * "url:daily:stats:" 키 패턴으로 저장된 일별 통계를 날짜 범위에 따라 조회합니다.</p>
+     *
+     * @param code 단축 코드
+     * @param startDate 시작 날짜
+     * @param endDate 종료 날짜
+     * @return batch-server가 처리한 통계 리스트 (없으면 null)
+     */
+    private List<DailyStatistics> getBatchProcessedStatistics(String code, LocalDate startDate, LocalDate endDate) {
         List<DailyStatistics> result = new ArrayList<>();
         LocalDate currentDate = startDate;
-        
+
         while (!currentDate.isAfter(endDate)) {
-            long accessCount = getAccessCountForDate(code, currentDate);
-            
-            // 0이 아닌 경우만 결과에 포함
-            if (accessCount > 0) {
-                result.add(DailyStatistics.builder()
-                        .code(code)
-                        .date(currentDate)
-                        .accessCount(accessCount)
-                        .uniqueVisitors(estimateUniqueVisitors(accessCount))
-                        .build());
+            String dateKey = currentDate.format(DateTimeFormatter.ISO_LOCAL_DATE);
+            String statsKey = "url:daily:stats:" + code + ":" + dateKey;
+
+            try {
+                Map<Object, Object> dailyStats = objectRedisTemplate.opsForHash().entries(statsKey);
+                if (dailyStats != null && !dailyStats.isEmpty()) {
+                    Long accessCount = getLongValue(dailyStats.get("accessCount"));
+                    Long uniqueVisitors = getLongValue(dailyStats.get("uniqueVisitors"));
+
+                    if (accessCount != null && accessCount > 0) {
+                        result.add(DailyStatistics.builder()
+                                .code(code)
+                                .date(currentDate)
+                                .accessCount(accessCount)
+                                .uniqueVisitors(uniqueVisitors != null ? uniqueVisitors : 0)
+                                .build());
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to get batch processed statistics for key: {}", statsKey, e);
             }
-            
+
             currentDate = currentDate.plusDays(1);
         }
-        
-        return result;
+
+        return result.isEmpty() ? null : result;
     }
-    
-    private void cacheStatistics(String cacheKey, List<DailyStatistics> statistics, long timeout, java.util.concurrent.TimeUnit unit) {
+
+    /**
+     * Object 값을 Long으로 안전하게 변환합니다.
+     */
+    private Long getLongValue(Object value) {
+        if (value == null) return null;
+        if (value instanceof Number) {
+            return ((Number) value).longValue();
+        }
         try {
-            String jsonValue = objectMapper.writeValueAsString(statistics);
-            objectRedisTemplate.opsForValue().set(cacheKey, jsonValue, timeout, unit);
-            log.debug("Cached statistics for key: {} with {} entries", cacheKey, statistics.size());
-        } catch (Exception e) {
-            log.warn("Failed to cache statistics for key: {}", cacheKey, e);
+            return Long.parseLong(value.toString());
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
+
     
     @Override
     public long getAccessCountForDate(String code, LocalDate date) {
-        String pattern = "url:access:count:" + code + ":*";
-        String targetDatePrefix = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
-        
-        ScanOptions scanOptions = ScanOptions.scanOptions()
-                .match(pattern)
-                .count(1000)
-                .build();
-        
-        long count = 0;
-        try (Cursor<String> cursor = stringRedisTemplate.scan(scanOptions)) {
-            while (cursor.hasNext()) {
-                String key = cursor.next();
-                if (key.contains(targetDatePrefix)) {
-                    count++;
-                }
+        // batch-server가 처리한 일별 통계에서 조회
+        String dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
+        String statsKey = "url:daily:stats:" + code + ":" + dateKey;
+
+        try {
+            Map<Object, Object> dailyStats = objectRedisTemplate.opsForHash().entries(statsKey);
+            if (dailyStats != null && !dailyStats.isEmpty()) {
+                Long accessCount = getLongValue(dailyStats.get("accessCount"));
+                return accessCount != null ? accessCount : 0;
             }
         } catch (Exception e) {
-            log.error("Failed to scan Redis keys for pattern: {} on date: {}", pattern, date, e);
-            return 0;
+            log.warn("Failed to get access count for date {} from batch statistics key: {}", date, statsKey, e);
         }
-        
-        return count;
-    }
-    
-    private long estimateUniqueVisitors(long accessCount) {
-        if (accessCount <= 0) {
-            return 0;
-        }
-        
-        // 현실적인 고유 방문자 추정 알고리즘:
-        // - 낮은 접근수: 고유 방문자 비율 높음 (90-95%)
-        // - 중간 접근수: 중간 비율 (70-80%)  
-        // - 높은 접근수: 중복 증가로 비율 감소 (50-70%)
-        
-        double uniqueRatio;
-        if (accessCount <= 10) {
-            // 1-10 접근: 거의 모두 고유 방문자
-            uniqueRatio = 0.95 - (accessCount - 1) * 0.02; // 95% -> 77%
-        } else if (accessCount <= 100) {
-            // 11-100 접근: 점진적 중복 증가
-            uniqueRatio = 0.77 - Math.log10(accessCount - 9) * 0.15; // 77% -> 62%
-        } else {
-            // 100+ 접근: 상당한 중복, 로그 스케일로 감소
-            uniqueRatio = 0.62 - Math.log10(accessCount / 100.0) * 0.1;
-            uniqueRatio = Math.max(uniqueRatio, 0.3); // 최소 30% 보장
-        }
-        
-        return Math.max(1, Math.round(accessCount * uniqueRatio));
+
+        return 0;
     }
 }
