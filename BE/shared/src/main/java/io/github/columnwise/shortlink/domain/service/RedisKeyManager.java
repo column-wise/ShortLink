@@ -14,7 +14,12 @@ public class RedisKeyManager {
     private static final String DAILY_STATS_KEY_TEMPLATE = "url:daily:stats:{%s}:%s";
     private static final String TOTAL_ACCESS_KEY_TEMPLATE = "url:total:access:{%s}:%s";
     private static final String LAST_ACCESS_KEY_TEMPLATE = "url:last:access:{%s}:%s";
-    
+    // url:hourly:access:{2025-09-15}:example
+    private static final String HOURLY_ACCESS_KEY_TEMPLATE = "url:hourly:access:{%s}:%s";
+    private static final String DAILY_UNIQUE_kEY_TEMPLATE = "url:daily:unique:{%s}:%s";
+    private static final String DAILY_USER_AGENT_kEY_TEMPLATE = "url:daily:ua:{%s}:%s";
+    private static final String DAILY_DEVICE_kEY_TEMPLATE = "url:daily:device:{%s}:%s";
+
     // 키 목록 관리를 위한 SET
     private static final String ACCESS_CODES_SET_TEMPLATE = "url:access:codes:{%s}";
     private static final String DAILY_CODES_SET_TEMPLATE = "url:daily:codes:{%s}";
@@ -27,6 +32,26 @@ public class RedisKeyManager {
     public static String getAccessCountKey(String code, LocalDate date) {
         String dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
         return String.format(ACCESS_COUNT_KEY_TEMPLATE, dateKey, code);
+    }
+
+    public static String getHourlyAccessKey(String code, LocalDate date) {
+        String dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
+        return String.format(HOURLY_ACCESS_KEY_TEMPLATE, dateKey, code);
+    }
+
+    public static String getDailyUniqueKey(String code, LocalDate date) {
+        String dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
+        return String.format(DAILY_UNIQUE_kEY_TEMPLATE, dateKey, code);
+    }
+
+    public static String getDailyUaKey(String code, LocalDate date) {
+        String dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
+        return String.format(DAILY_USER_AGENT_kEY_TEMPLATE, dateKey, code);
+    }
+
+    public static String getDailyDeviceKey(String code, LocalDate date) {
+        String dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
+        return String.format(DAILY_DEVICE_kEY_TEMPLATE, dateKey, code);
     }
     
     public static String getDailyStatsKey(String code, LocalDate date) {
