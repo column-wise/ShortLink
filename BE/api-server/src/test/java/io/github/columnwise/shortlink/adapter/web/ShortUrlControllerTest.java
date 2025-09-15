@@ -148,10 +148,12 @@ class ShortUrlControllerTest {
         String code = "notfound";
 
         when(getStatsUseCase.getDailyStatistics(eq(code), any(LocalDate.class), any(LocalDate.class)))
-                .thenThrow(new UrlNotFoundException("URL not found for code: " + code));
+                .thenReturn(List.of()); // dev 브랜치에서는 빈 리스트 반환
 
         // When & Then
         mockMvc.perform(get("/api/v1/urls/" + code + "/stats"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$").isEmpty());
     }
 }

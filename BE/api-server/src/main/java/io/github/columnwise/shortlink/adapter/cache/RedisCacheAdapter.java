@@ -11,6 +11,20 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.util.Optional;
 
+/**
+ * Redis 기반 캐시 어댑터 구현체
+ *
+ * <p>ShortUrl 데이터를 Redis에 캐싱하여 성능을 향상시키는 어댑터입니다.
+ * TTL 설정을 통해 자동 만료 처리를 지원하며, 예외 상황에 대한 강고한 처리를 제공합니다.</p>
+ *
+ * <p>주요 기능:</p>
+ * <ul>
+ *   <li>ShortUrl 데이터 캐싱 및 조회</li>
+ *   <li>TTL 기반 자동 만료 처리</li>
+ *   <li>캐시 비워 지기 및 만료 시간 조정</li>
+ *   <li>예외 상황 대응 및 로깅</li>
+ * </ul>
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -19,6 +33,15 @@ public class RedisCacheAdapter implements CachePort {
     private final RedisTemplate<String, ShortUrl> redisTemplate;
     private final RedisProperties redisProperties;
     
+    /**
+     * 단축 코드로 캐시된 ShortUrl을 조회합니다.
+     *
+     * <p>캐시 히트 시 데이터베이스 접근 없이 빠른 응답을 제공합니다.
+     * 예외 발생 시 빈 Optional을 반환하여 안전하게 처리합니다.</p>
+     *
+     * @param code 조회할 단축 코드
+     * @return 캐시된 ShortUrl (Optional)
+     */
     @Override
     public Optional<ShortUrl> findByCode(String code) {
         if (code == null || code.trim().isEmpty()) {
@@ -41,6 +64,14 @@ public class RedisCacheAdapter implements CachePort {
         }
     }
     
+    /**
+     * ShortUrl을 캐시에 저장합니다.
+     *
+     * <p>설정된 TTL을 사용하여 자동 만료 처리를 적용합니다.
+     * 저장 실패 시 로깅만 하고 예외를 전파하지 않습니다.</p>
+     *
+     * @param shortUrl 캐시에 저장할 ShortUrl
+     */
     @Override
     public void save(ShortUrl shortUrl) {
         if (shortUrl == null || shortUrl.code() == null || shortUrl.code().trim().isEmpty()) {
@@ -58,6 +89,11 @@ public class RedisCacheAdapter implements CachePort {
         }
     }
     
+    /**
+     * 단축 코드에 해당하는 캐시 엔트리를 삭제합니다.
+     *
+     * @param code 삭제할 단축 코드
+     */
     @Override
     public void delete(String code) {
         if (code == null || code.trim().isEmpty()) {
@@ -78,6 +114,12 @@ public class RedisCacheAdapter implements CachePort {
         }
     }
     
+    /**
+     * 단축 코드에 해당하는 캐시 엔트리의 만료 시간을 설정합니다.
+     *
+     * @param code 대상 단축 코드
+     * @param seconds 만료 시간 (초 단위, 양수여야 함)
+     */
     @Override
     public void setExpiration(String code, long seconds) {
         if (code == null || code.trim().isEmpty()) {
@@ -102,6 +144,12 @@ public class RedisCacheAdapter implements CachePort {
         }
     }
     
+    /**
+     * 단축 코드로부터 Redis 캐시 키를 생성합니다.
+     *
+     * @param code 단축 코드
+     * @return Redis 캐시 키 (프리픽스 + 코드)
+     */
     private String getCacheKey(String code) {
         return redisProperties.getCache().getKeyPrefix() + code;
     }
