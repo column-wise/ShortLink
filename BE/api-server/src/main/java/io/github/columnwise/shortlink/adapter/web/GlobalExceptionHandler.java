@@ -1,6 +1,7 @@
 package io.github.columnwise.shortlink.adapter.web;
 
 import io.github.columnwise.shortlink.domain.exception.UrlNotFoundException;
+import io.github.columnwise.shortlink.domain.exception.CodeCollisionException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -41,10 +42,29 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(UrlNotFoundException.class)
     public ResponseEntity<Map<String, String>> handleUrlNotFoundException(UrlNotFoundException ex) {
+        log.warn("[404] URL not found: {}", ex.getMessage());
         Map<String, String> error = new HashMap<>();
         error.put("error", "URL_NOT_FOUND");
-        error.put("message", ex.getMessage());
+        error.put("message", "The requested URL was not found");
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
+    /**
+     * 코드 충돌 예외를 처리합니다.
+     *
+     * <p>단축 코드 생성 시 최대 재시도 후에도 고유한 코드를 생성하지 못한 경우 발생합니다.
+     * 일시적인 시스템 과부하 상태로 간주하여 503 Service Unavailable을 반환합니다.</p>
+     *
+     * @param ex CodeCollisionException 예외
+     * @return 503 Service Unavailable 응답
+     */
+    @ExceptionHandler(CodeCollisionException.class)
+    public ResponseEntity<Map<String, String>> handleCodeCollisionException(CodeCollisionException ex) {
+        log.error("[503] Code collision occurred: {}", ex.getMessage());
+        Map<String, String> error = new HashMap<>();
+        error.put("error", "SERVICE_UNAVAILABLE");
+        error.put("message", "Service is temporarily unavailable. Please try again later.");
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(error);
     }
 
     /**
@@ -55,6 +75,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> handleValidationException(MethodArgumentNotValidException ex) {
+        log.warn("[400] Validation failed with {} errors", ex.getBindingResult().getErrorCount());
         Map<String, String> errors = new HashMap<>();
         ex.getBindingResult().getAllErrors().forEach((error) -> {
             String fieldName = ((FieldError) error).getField();
@@ -105,6 +126,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleGenericException(Exception ex) {
+        log.error("[500] Unexpected error occurred: {}", ex.getMessage(), ex);
         Map<String, String> error = new HashMap<>();
         error.put("error", "INTERNAL_SERVER_ERROR");
         error.put("message", "An unexpected error occurred");

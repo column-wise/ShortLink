@@ -148,28 +148,24 @@ public class CreateShortUrlService implements CreateShortUrlUseCase {
     /**
      * 로깅용 URL 마스킹 처리
      *
-     * <p>보안상 민감할 수 있는 URL 정보를 마스킹하여 로그에 기록합니다.</p>
+     * <p>보안상 민감할 수 있는 URL 정보를 SHA-256 해시로 마스킹하여 로그에 기록합니다.
+     * 해시를 통해 개인정보 노출을 방지하면서도 디버깅 시 동일한 URL을 식별할 수 있습니다.</p>
      *
      * @param url 원본 URL
-     * @return 마스킹된 URL
+     * @return 마스킹된 URL (hash=...)
      */
     private String maskUrl(String url) {
-        if (url == null || url.length() <= 10) {
-            return url;
+        if (url == null) {
+            return "n/a";
         }
 
-        // 프로토콜과 도메인은 유지하고 경로는 마스킹
-        int protocolEnd = url.indexOf("://");
-        if (protocolEnd == -1) {
-            return url.substring(0, 10) + "***";
+        try {
+            var md = java.security.MessageDigest.getInstance("SHA-256");
+            var b64 = java.util.Base64.getEncoder().encodeToString(
+                md.digest(url.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            return "hash=" + b64.substring(0, 16);
+        } catch (Exception ignore) {
+            return "hash=n/a";
         }
-
-        int pathStart = url.indexOf("/", protocolEnd + 3);
-        if (pathStart == -1) {
-            return url; // 경로가 없으면 그대로 반환
-        }
-
-        String baseUrl = url.substring(0, pathStart);
-        return baseUrl + "/***";
     }
 }

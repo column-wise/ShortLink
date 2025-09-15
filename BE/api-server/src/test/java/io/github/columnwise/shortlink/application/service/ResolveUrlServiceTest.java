@@ -71,11 +71,14 @@ class ResolveUrlServiceTest {
         assertThat(result).isEqualTo(longUrl);
         verify(shortUrlRepository).findByCode(code);
         
-        // 방문 기록이 Redis에 저장되었는지 확인 (구현 디테일이 아닌 행위 검증)
+        // 방문 기록이 Redis에 저장되었는지 확인 (일별 카운터 증가 및 TTL 설정)
         verify(redisTemplate).opsForValue();
-        verify(valueOperations).set(
-            argThat(key -> key.matches("url:access:count:" + code + ":\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}")), 
-            eq("1")
+        verify(valueOperations).increment(
+            argThat(key -> key.matches("url:access:count:" + code + ":\\d{4}-\\d{2}-\\d{2}"))
+        );
+        verify(redisTemplate).expire(
+            argThat(key -> key.matches("url:access:count:" + code + ":\\d{4}-\\d{2}-\\d{2}")),
+            eq(java.time.Duration.ofDays(90))
         );
     }
 

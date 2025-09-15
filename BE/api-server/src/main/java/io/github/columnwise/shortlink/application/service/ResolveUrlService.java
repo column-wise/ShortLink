@@ -59,20 +59,18 @@ public class ResolveUrlService implements ResolveUrlUseCase {
     /**
      * 방문 기록을 Redis에 저장합니다.
      *
-     * <p>현재 시간을 기반으로 타임스탬프 키를 생성하여 방문을 기록합니다.
-     * 각 방문은 개별 키로 저장되어 나중에 통계 집계 시 활용됩니다.</p>
+     * <p>현재 시간을 기반으로 일별 카운터를 증가시키고 TTL을 설정하여 자동 정리합니다.
+     * 개별 타임스탬프 키 대신 일별 집계된 카운터를 사용하여 성능을 최적화합니다.</p>
      *
      * @param code 방문된 단축 코드
      */
     private void recordVisit(String code) {
         LocalDateTime now = LocalDateTime.now(clock);
-        LocalDate date = now.toLocalDate();
-        String timestamp = now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-        
-        // RedisKeyManager를 사용하여 일관된 키 패턴 적용
-        String accessKey = "url:access:count:" + code + ":" + timestamp;
-        
-        // 해당 키에 값을 설정 (값은 1로 고정, 키 존재 자체가 방문을 의미)
-        redisTemplate.opsForValue().set(accessKey, "1");
+        String dayBucket = now.format(DateTimeFormatter.ISO_LOCAL_DATE);
+        String counterKey = "url:access:count:" + code + ":" + dayBucket;
+
+        // 일별 카운터 증가 및 TTL 설정 (90일 보관)
+        redisTemplate.opsForValue().increment(counterKey);
+        redisTemplate.expire(counterKey, java.time.Duration.ofDays(90));
     }
 }
