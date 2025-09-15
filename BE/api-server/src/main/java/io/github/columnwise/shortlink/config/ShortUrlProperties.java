@@ -41,4 +41,13 @@ public class ShortUrlProperties {
      */
     @Positive(message = "defaultExpirationDays must be positive")
     private long defaultExpirationDays = 365;
+
+    /**
+     * Redis 방문 통계 TTL (일)
+     *
+     * <p>Redis에 저장되는 방문 통계 데이터의 보관 기간입니다.
+     * 양수 값이어야 하며, 일반적으로 30일에서 180일 사이의 값을 권장합니다.</p>
+     */
+    @Positive(message = "visitStatisticsTtlDays must be positive")
+    private long visitStatisticsTtlDays = 90;
 }

@@ -1,6 +1,7 @@
 package io.github.columnwise.shortlink.application.service;
 
 import io.github.columnwise.shortlink.application.port.out.ShortUrlRepositoryPort;
+import io.github.columnwise.shortlink.config.ShortUrlProperties;
 import io.github.columnwise.shortlink.domain.exception.UrlNotFoundException;
 import io.github.columnwise.shortlink.domain.model.ShortUrl;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,7 +33,10 @@ class ResolveUrlServiceTest {
     
     @Mock
     private ValueOperations<String, String> valueOperations;
-    
+
+    @Mock
+    private ShortUrlProperties properties;
+
     @Mock
     private Clock clock;
 
@@ -40,7 +44,7 @@ class ResolveUrlServiceTest {
 
     @BeforeEach
     void setUp() {
-        resolveUrlService = new ResolveUrlService(shortUrlRepository, redisTemplate, clock);
+        resolveUrlService = new ResolveUrlService(shortUrlRepository, redisTemplate, properties, clock);
     }
 
     @Test
@@ -61,6 +65,7 @@ class ResolveUrlServiceTest {
 
         when(shortUrlRepository.findByCode(code)).thenReturn(Optional.of(shortUrl));
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(properties.getVisitStatisticsTtlDays()).thenReturn(90L);
         when(clock.instant()).thenReturn(fixedTime.toInstant(ZoneOffset.UTC));
         when(clock.getZone()).thenReturn(ZoneOffset.UTC);
 

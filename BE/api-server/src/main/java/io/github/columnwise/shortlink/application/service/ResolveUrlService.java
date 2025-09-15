@@ -2,6 +2,7 @@ package io.github.columnwise.shortlink.application.service;
 
 import io.github.columnwise.shortlink.application.port.in.ResolveUrlUseCase;
 import io.github.columnwise.shortlink.application.port.out.ShortUrlRepositoryPort;
+import io.github.columnwise.shortlink.config.ShortUrlProperties;
 import io.github.columnwise.shortlink.domain.service.RedisKeyManager;
 import org.springframework.data.redis.core.RedisTemplate;
 import io.github.columnwise.shortlink.domain.exception.UrlNotFoundException;
@@ -30,9 +31,10 @@ import java.time.format.DateTimeFormatter;
 @Service
 @RequiredArgsConstructor
 public class ResolveUrlService implements ResolveUrlUseCase {
-    
+
     private final ShortUrlRepositoryPort shortUrlRepository;
     private final RedisTemplate<String, String> redisTemplate;
+    private final ShortUrlProperties properties;
     private final Clock clock;
     
     /**
@@ -69,8 +71,8 @@ public class ResolveUrlService implements ResolveUrlUseCase {
         String dayBucket = now.format(DateTimeFormatter.ISO_LOCAL_DATE);
         String counterKey = "url:access:count:" + code + ":" + dayBucket;
 
-        // 일별 카운터 증가 및 TTL 설정 (90일 보관)
+        // 일별 카운터 증가 및 TTL 설정 (설정 가능한 보관 기간)
         redisTemplate.opsForValue().increment(counterKey);
-        redisTemplate.expire(counterKey, java.time.Duration.ofDays(90));
+        redisTemplate.expire(counterKey, java.time.Duration.ofDays(properties.getVisitStatisticsTtlDays()));
     }
 }
