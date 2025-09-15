@@ -1,14 +1,11 @@
 package io.github.columnwise.shortlink.adapter.persistence;
 
 import io.github.columnwise.shortlink.adapter.persistence.entity.ShortUrlEntity;
-import io.github.columnwise.shortlink.adapter.persistence.entity.UrlAccessLogEntity;
 import io.github.columnwise.shortlink.application.port.out.ShortUrlRepositoryPort;
 import io.github.columnwise.shortlink.domain.model.ShortUrl;
-import io.github.columnwise.shortlink.domain.model.UrlAccessLog;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -30,7 +27,6 @@ import java.util.Optional;
 public class ShortUrlRepositoryAdapter implements ShortUrlRepositoryPort {
     
     private final SpringDataShortUrlRepository shortUrlRepository;
-    private final SpringDataUrlAccessLogRepository accessLogRepository;
     
     /**
      * ShortUrl 도메인 모델을 데이터베이스에 저장합니다.
@@ -79,22 +75,6 @@ public class ShortUrlRepositoryAdapter implements ShortUrlRepositoryPort {
                         .build());
     }
     
-    /**
-     * URL 접속 로그를 데이터베이스에 저장합니다.
-     *
-     * @param accessLog 저장할 URL 접속 로그
-     */
-    @Override
-    public void saveAccessLog(UrlAccessLog accessLog) {
-        UrlAccessLogEntity entity = UrlAccessLogEntity.builder()
-                .code(accessLog.code())
-                .ipAddress(accessLog.ipAddress())
-                .userAgent(accessLog.userAgent())
-                .accessedAt(accessLog.accessedAt())
-                .build();
-                
-        accessLogRepository.save(entity);
-    }
     
     /**
      * 원본 URL로 ShortUrl을 조회합니다.
@@ -114,25 +94,4 @@ public class ShortUrlRepositoryAdapter implements ShortUrlRepositoryPort {
                         .build());
     }
     
-    /**
-     * 단축 코드에 대한 접속 로그 목록을 조회합니다.
-     *
-     * <p>접속 시간 내림차순으로 정렬된 로그 목록을 반환합니다.</p>
-     *
-     * @param code 조회할 단축 코드
-     * @return URL 접속 로그 목록
-     */
-    @Override
-    public List<UrlAccessLog> findAccessLogsByCode(String code) {
-        return accessLogRepository.findByCodeOrderByAccessedAtDesc(code)
-                .stream()
-                .map(entity -> UrlAccessLog.builder()
-                        .id(entity.getId())
-                        .code(entity.getCode())
-                        .ipAddress(entity.getIpAddress())
-                        .userAgent(entity.getUserAgent())
-                        .accessedAt(entity.getAccessedAt())
-                        .build())
-                .toList();
-    }
 }

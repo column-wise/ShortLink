@@ -6,6 +6,7 @@ import io.github.columnwise.shortlink.config.ShortUrlProperties;
 import io.github.columnwise.shortlink.domain.exception.CodeCollisionException;
 import io.github.columnwise.shortlink.domain.model.ShortUrl;
 import io.github.columnwise.shortlink.domain.service.CodeGenerator;
+import io.github.columnwise.shortlink.util.HashUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -59,7 +60,10 @@ public class CreateShortUrlService implements CreateShortUrlUseCase {
     @Override
     @Transactional(readOnly = true)
     public ShortUrl createShortUrl(String longUrl) {
-        String maskedUrl = maskUrl(longUrl);
+
+        // 로깅용 URL 마스킹 처리
+        // 보안상 민감할 수 있는 URL 정보를 마스킹하여 기록
+        String maskedUrl = HashUtils.sha256(longUrl);
         log.debug("Creating short URL for: {}", maskedUrl);
 
         // 기존 URL이 있으면 반환
@@ -143,29 +147,5 @@ public class CreateShortUrlService implements CreateShortUrlUseCase {
                message.contains("duplicate") ||
                message.contains("duplicate key") ||
                message.contains("code already exists");
-    }
-
-    /**
-     * 로깅용 URL 마스킹 처리
-     *
-     * <p>보안상 민감할 수 있는 URL 정보를 SHA-256 해시로 마스킹하여 로그에 기록합니다.
-     * 해시를 통해 개인정보 노출을 방지하면서도 디버깅 시 동일한 URL을 식별할 수 있습니다.</p>
-     *
-     * @param url 원본 URL
-     * @return 마스킹된 URL (hash=...)
-     */
-    private String maskUrl(String url) {
-        if (url == null) {
-            return "n/a";
-        }
-
-        try {
-            var md = java.security.MessageDigest.getInstance("SHA-256");
-            var b64 = java.util.Base64.getEncoder().encodeToString(
-                md.digest(url.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
-            return "hash=" + b64.substring(0, 16);
-        } catch (Exception ignore) {
-            return "hash=n/a";
-        }
     }
 }
