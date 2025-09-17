@@ -9,12 +9,14 @@ import org.springframework.data.redis.core.RedisTemplate;
 import io.github.columnwise.shortlink.domain.exception.UrlNotFoundException;
 import io.github.columnwise.shortlink.domain.model.ShortUrl;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * URL 해석 서비스 구현체
@@ -37,6 +39,42 @@ public class ResolveUrlService implements ResolveUrlUseCase {
     private final RedisTemplate<String, String> redisTemplate;
     private final ShortUrlProperties properties;
     private final Clock clock;
+    private final DefaultRedisScript<Long> recordVisitScript = new DefaultRedisScript<>(LUA_RECORD_VISIT, Long.class);
+    private static final String LUA_RECORD_VISIT = """
+            -- KEYS: 4 (hourlyKey, uniqueKey, uaKey, diviceKey)
+            -- ARGV: hourField, visitorHash, uaFamily, deviceType, ttlSeconds
+            local hourlyKey      = KEYS[1]
+            local uniqueKey      = KEYS[2]
+            local uaKey          = KEYS[3]
+            local diviceKey      = KEYS[4]
+            local hourField      = ARGV[1]
+            local visitorHash    = ARGV[2]
+            local uaFamily       = ARGV[3]
+            local deviceType     = ARGV[4]
+            local ttl            = tonumber(ARGV[5]);
+            
+            -- hourly (HINCRBY) + first-time expire
+            local hourlyNew = redis.call('EXISTS', hourlyKey) == 0
+            redis.call('HINCRBY', hourlyKey, hourField, 1)
+            if hourlyNew then redis.call('EXPIRE', hourlyKey, ttl) end
+            
+            -- unique (PFADD) + first-time expire
+            local uniqueNew = redis.call('EXISTS', uniqueKey) == 0
+            redis.call('PFADD', uniqueKey, visitorHash)
+            if uniqueNew then redis.call('EXPIRE', uniqueKey, ttl) end
+            
+            -- ua hash
+            local uaNew = redis.call('EXISTS', uaKey) == 0
+            redis.call('HINCRBY', uaKey, uaFamily, 1)
+            if uaNew then redis.call('EXPIRE', uaKey, ttl) end
+            
+            -- device hash
+            local deviceNew = redis.call('EXISTS', deviceKey) == 0
+            redis.call('HINCRBY', deviceKey, deviceType, 1)
+            if deviceNew then redis.call('EXPIRE', deviceKey, ttl) end
+            
+            return 1
+            """;
     
     /**
      * 단축 코드를 통해 원본 URL을 조회하고 방문을 기록합니다.
@@ -71,6 +109,11 @@ public class ResolveUrlService implements ResolveUrlUseCase {
         LocalDate today = LocalDate.now(clock);
         int hour = LocalDateTime.now(clock).getHour();
 
+        // 입력 정규화 방어 (null/빈값 → "unknown")
+        String ua = (uaFamily == null || uaFamily.isBlank()) ? "unknown" : uaFamily;
+        String device = (deviceType == null || deviceType.isBlank()) ? "unknown" : deviceType;
+
+        // cookieId, salt도 포함하면 좋을 듯
         String visitorHash = HashUtils.sha256(ip + "|" + uaFamily);
 
         String hourlyKey  = RedisKeyManager.getHourlyAccessKey(code, today);
@@ -78,30 +121,10 @@ public class ResolveUrlService implements ResolveUrlUseCase {
         String uaKey      = RedisKeyManager.getDailyUaKey(code, today);
         String deviceKey  = RedisKeyManager.getDailyDeviceKey(code, today);
 
-        // 시간대별
-        redisTemplate.opsForHash().increment(hourlyKey, String.format("%02d", hour), 1);
+        List<String> keys = List.of(hourlyKey, uniqueKey, uaKey, deviceKey);
+        List<String> args = List.of(String.format("%02d", hour), visitorHash, ua, device,
+                String.valueOf(Duration.ofDays(3).toSeconds()));
 
-        // 고유 방문자
-        redisTemplate.opsForHyperLogLog().add(uniqueKey, visitorHash);
-
-        // 브라우저
-        redisTemplate.opsForHash().increment(uaKey, uaFamily, 1);
-
-        // 디바이스
-        redisTemplate.opsForHash().increment(deviceKey, deviceType, 1);
-
-        // TTL은 키 최초 생성 시만
-        if (Boolean.FALSE.equals(redisTemplate.hasKey(hourlyKey))) {
-            redisTemplate.expire(hourlyKey, Duration.ofDays(2));
-        }
-        if (Boolean.FALSE.equals(redisTemplate.hasKey(uniqueKey))) {
-            redisTemplate.expire(uniqueKey, Duration.ofDays(2));
-        }
-        if (Boolean.FALSE.equals(redisTemplate.hasKey(uaKey))) {
-            redisTemplate.expire(uaKey, Duration.ofDays(2));
-        }
-        if (Boolean.FALSE.equals(redisTemplate.hasKey(deviceKey))) {
-            redisTemplate.expire(deviceKey, Duration.ofDays(2));
-        }
+        redisTemplate.execute(recordVisitScript, keys, args.toArray());
     }
 }
