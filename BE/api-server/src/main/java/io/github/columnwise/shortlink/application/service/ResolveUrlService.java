@@ -41,12 +41,12 @@ public class ResolveUrlService implements ResolveUrlUseCase {
     private final Clock clock;
     private final DefaultRedisScript<Long> recordVisitScript = new DefaultRedisScript<>(LUA_RECORD_VISIT, Long.class);
     private static final String LUA_RECORD_VISIT = """
-            -- KEYS: 4 (hourlyKey, uniqueKey, uaKey, diviceKey)
+            -- KEYS: 4 (hourlyKey, uniqueKey, uaKey, deviceKey)
             -- ARGV: hourField, visitorHash, uaFamily, deviceType, ttlSeconds
             local hourlyKey      = KEYS[1]
             local uniqueKey      = KEYS[2]
             local uaKey          = KEYS[3]
-            local diviceKey      = KEYS[4]
+            local deviceKey      = KEYS[4]
             local hourField      = ARGV[1]
             local visitorHash    = ARGV[2]
             local uaFamily       = ARGV[3]
@@ -114,7 +114,7 @@ public class ResolveUrlService implements ResolveUrlUseCase {
         String device = (deviceType == null || deviceType.isBlank()) ? "unknown" : deviceType;
 
         // cookieId, salt도 포함하면 좋을 듯
-        String visitorHash = HashUtils.sha256(ip + "|" + uaFamily);
+        String visitorHash = HashUtils.sha256(ip + "|" + ua);
 
         String hourlyKey  = RedisKeyManager.getHourlyAccessKey(code, today);
         String uniqueKey  = RedisKeyManager.getDailyUniqueKey(code, today);
@@ -123,7 +123,7 @@ public class ResolveUrlService implements ResolveUrlUseCase {
 
         List<String> keys = List.of(hourlyKey, uniqueKey, uaKey, deviceKey);
         List<String> args = List.of(String.format("%02d", hour), visitorHash, ua, device,
-                String.valueOf(Duration.ofDays(3).toSeconds()));
+                String.valueOf(Duration.ofDays(properties.getDefaultExpirationDays()).toSeconds()));
 
         redisTemplate.execute(recordVisitScript, keys, args.toArray());
     }
