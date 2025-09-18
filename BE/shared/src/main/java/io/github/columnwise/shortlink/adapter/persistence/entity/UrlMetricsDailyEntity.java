@@ -57,12 +57,6 @@ public class UrlMetricsDailyEntity {
     @Column(name = "device_accesses_json", nullable = false, columnDefinition = "JSON")
     private String deviceAccessesJson;
 
-    /**
-     * 디바이스별 유니크 방문자 수 JSON
-     * 예: {"mobile":150, "desktop":200, "tablet":30}
-     */
-    @Column(name = "device_unique_visitors_json", nullable = false, columnDefinition = "JSON")
-    private String deviceUniqueVisitorsJson;
 
     /**
      * 업데이트 시각
