@@ -105,30 +105,6 @@ public class RedisStatisticsReaderAdapter implements RedisStatisticsReaderPort {
         return getHashStatistics(key, code, date, "device");
     }
 
-    @Override
-    public Map<String, Long> getDailyDeviceUniqueVisitorsCount(String code, LocalDate date) {
-        // 각 디바이스별 HLL에서 PFCOUNT 수행
-        Map<String, Long> deviceUvCounts = new HashMap<>();
-
-        try {
-            // 먼저 디바이스 목록을 가져옴 (device PV 키에서)
-            Map<String, Long> devicePv = getDeviceStatistics(code, date);
-
-            for (String device : devicePv.keySet()) {
-                // 각 디바이스별 UV HLL 키에서 개수 계산
-                String deviceUvKey = String.format("url:daily:device:uv:%s:%s:%s",
-                    date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")), code, device);
-
-                Long count = redisTemplate.opsForHyperLogLog().size(deviceUvKey);
-                deviceUvCounts.put(device, count != null ? count : 0L);
-            }
-
-            return deviceUvCounts;
-        } catch (Exception e) {
-            log.error("Failed to get device unique visitors count for code: {}, date: {}", code, date, e);
-            return Collections.emptyMap();
-        }
-    }
 
     @Override
     public int cleanupProcessedData(String code, LocalDate date) {

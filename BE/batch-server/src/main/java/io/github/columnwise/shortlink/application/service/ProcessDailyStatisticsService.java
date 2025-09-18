@@ -103,11 +103,6 @@ public class ProcessDailyStatisticsService implements ProcessDailyStatisticsUseC
 				).orElseGet(Map::of);
 				String devicePvJson = objectMapper.writeValueAsString(devicePv);
 
-				// 4) 디바이스 UV (Redis 각 디바이스별 HLL PFCOUNT)
-				Map<String, Long> deviceUv = Optional.ofNullable(
-					redisStatisticsReaderPort.getDailyDeviceUniqueVisitorsCount(code, targetDate)
-				).orElseGet(Map::of);
-				String deviceUvJson = objectMapper.writeValueAsString(deviceUv);
 
 				// 5) UPSERT daily
 				UrlMetricsDailyEntity daily = urlMetricsWriterPort.findDailyMetrics(code, targetDate)
@@ -117,13 +112,11 @@ public class ProcessDailyStatisticsService implements ProcessDailyStatisticsUseC
 						.accesses(0L)
 						.uniqueVisitors(0L)
 						.deviceAccessesJson("{}")
-						.deviceUniqueVisitorsJson("{}")
 						.build());
 
 				daily.setAccesses(totalAccesses);
 				daily.setUniqueVisitors(uniqueVisitors);
 				daily.setDeviceAccessesJson(devicePvJson);
-				daily.setDeviceUniqueVisitorsJson(deviceUvJson);
 
 				urlMetricsWriterPort.saveDailyMetrics(daily);
 				processedInChunk++;
