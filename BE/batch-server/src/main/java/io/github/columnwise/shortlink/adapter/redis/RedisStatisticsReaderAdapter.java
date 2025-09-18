@@ -1,6 +1,7 @@
 package io.github.columnwise.shortlink.adapter.redis;
 
-import io.github.columnwise.shortlink.application.port.out.RedisStatisticsReader;
+import io.github.columnwise.shortlink.application.port.out.RedisStatisticsReaderPort;
+import io.github.columnwise.shortlink.domain.service.RedisKeyManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.Cursor;
@@ -13,86 +14,170 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Redis 통계 데이터 읽기 어댑터 구현체
+ *
+ * API 서버가 저장한 Redis 통계 데이터를 읽어오는 어댑터입니다.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class RedisStatisticsReaderAdapter implements RedisStatisticsReader {
+public class RedisStatisticsReaderAdapter implements RedisStatisticsReaderPort {
 
     private final RedisTemplate<String, Object> redisTemplate;
 
-    private static final String ACCESS_COUNT_KEY_PREFIX = "url:access:count:";
-    private static final String DAILY_STATS_KEY_PREFIX = "url:daily:stats:";
-
     @Override
-    public Set<String> findAccessCountKeys(LocalDate date) {
-        // 개별 타임스탬프 키 패턴으로 스캔 (API 서버가 생성한 키들)
-        String pattern = ACCESS_COUNT_KEY_PREFIX + "*";
-        String targetDatePrefix = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
+    public Set<String> findCodesWithStatistics(LocalDate date) {
+        String pattern = RedisKeyManager.getHourlyAccessKey("*", date);
 
+        Set<String> codes = new HashSet<>();
         ScanOptions scanOptions = ScanOptions.scanOptions()
                 .match(pattern)
                 .count(1000)
                 .build();
 
-        Set<String> matchingKeys = new HashSet<>();
         try (Cursor<String> cursor = redisTemplate.scan(scanOptions)) {
             while (cursor.hasNext()) {
                 String key = cursor.next();
-                // 키가 특정 날짜의 타임스탬프를 포함하는지 확인
-                // 예: url:access:count:abc123:2024-01-01T12:34:56
-                if (key.contains(targetDatePrefix)) {
-                    matchingKeys.add(key);
+                String code = extractCodeFromKey(key);
+                if (code != null) {
+                    codes.add(code);
                 }
             }
         } catch (Exception e) {
-            log.error("Failed to scan access count keys for date: {}", date, e);
-            return Collections.emptySet();
+            log.error("Failed to scan codes for date: {}", date, e);
         }
 
-        log.debug("Found {} access count keys for date: {}", matchingKeys.size(), date);
-        return matchingKeys;
+        log.debug("Found {} codes with statistics for date: {}", codes.size(), date);
+        return codes;
     }
 
     @Override
-    public Long getAccessCount(String key) {
-        Object value = redisTemplate.opsForValue().get(key);
-        if (value == null) {
-            return null;
-        }
-        
+    public Map<String, Long> getHourlyAccesses(String code, LocalDate date) {
+        String key = RedisKeyManager.getHourlyAccessKey(code, date);
+
         try {
-            return Long.parseLong(value.toString());
-        } catch (NumberFormatException e) {
+            Map<Object, Object> hourlyData = redisTemplate.opsForHash().entries(key);
+            if (hourlyData.isEmpty()) {
+                return Collections.emptyMap();
+            }
+
+            return hourlyData.entrySet().stream()
+                    .collect(Collectors.toMap(
+                            entry -> entry.getKey().toString(),
+                            entry -> Long.parseLong(entry.getValue().toString())
+                    ));
+        } catch (Exception e) {
+            log.error("Failed to get hourly accesses for code: {}, date: {}", code, date, e);
+            return Collections.emptyMap();
+        }
+    }
+
+    @Override
+    public Set<String> findCodesWithStatistics(LocalDate date, int hour) {
+        // 시간별 인덱스가 있다면 사용, 없으면 전체 스캔 후 필터링
+        return findCodesWithStatistics(date);
+    }
+
+    @Override
+    public long getDailyUniqueVisitorsCount(String code, LocalDate date) {
+        String key = RedisKeyManager.getDailyUniqueKey(code, date);
+
+        try {
+            // HLL PFCOUNT로 유니크 방문자 수 계산
+            Long count = redisTemplate.opsForHyperLogLog().size(key);
+            return count != null ? count : 0L;
+        } catch (Exception e) {
+            log.error("Failed to get unique visitors count for code: {}, date: {}", code, date, e);
+            return 0L;
+        }
+    }
+
+    @Override
+    public Map<String, Long> getUserAgentStatistics(String code, LocalDate date) {
+        String key = RedisKeyManager.getDailyUaKey(code, date);
+        return getHashStatistics(key, code, date, "user agent");
+    }
+
+    @Override
+    public Map<String, Long> getDeviceStatistics(String code, LocalDate date) {
+        String key = RedisKeyManager.getDailyDeviceKey(code, date);
+        return getHashStatistics(key, code, date, "device");
+    }
+
+    @Override
+    public Map<String, Long> getDailyDeviceUniqueVisitorsCount(String code, LocalDate date) {
+        // 각 디바이스별 HLL에서 PFCOUNT 수행
+        Map<String, Long> deviceUvCounts = new HashMap<>();
+
+        try {
+            // 먼저 디바이스 목록을 가져옴 (device PV 키에서)
+            Map<String, Long> devicePv = getDeviceStatistics(code, date);
+
+            for (String device : devicePv.keySet()) {
+                // 각 디바이스별 UV HLL 키에서 개수 계산
+                String deviceUvKey = String.format("url:daily:device:uv:%s:%s:%s",
+                    date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")), code, device);
+
+                Long count = redisTemplate.opsForHyperLogLog().size(deviceUvKey);
+                deviceUvCounts.put(device, count != null ? count : 0L);
+            }
+
+            return deviceUvCounts;
+        } catch (Exception e) {
+            log.error("Failed to get device unique visitors count for code: {}, date: {}", code, date, e);
+            return Collections.emptyMap();
+        }
+    }
+
+    @Override
+    public int cleanupProcessedData(String code, LocalDate date) {
+        List<String> keysToDelete = Arrays.asList(
+                RedisKeyManager.getHourlyAccessKey(code, date),
+                RedisKeyManager.getDailyUniqueKey(code, date),
+                RedisKeyManager.getDailyUaKey(code, date),
+                RedisKeyManager.getDailyDeviceKey(code, date)
+        );
+
+        try {
+            Long deletedCount = redisTemplate.delete(keysToDelete);
+            log.debug("Cleaned up {} keys for code: {}, date: {}", deletedCount, code, date);
+            return deletedCount != null ? deletedCount.intValue() : 0;
+        } catch (Exception e) {
+            log.error("Failed to cleanup data for code: {}, date: {}", code, date, e);
+            return 0;
+        }
+    }
+
+    private Map<String, Long> getHashStatistics(String key, String code, LocalDate date, String type) {
+        try {
+            Map<Object, Object> hashData = redisTemplate.opsForHash().entries(key);
+            if (hashData.isEmpty()) {
+                return Collections.emptyMap();
+            }
+
+            return hashData.entrySet().stream()
+                    .collect(Collectors.toMap(
+                            entry -> entry.getKey().toString(),
+                            entry -> Long.parseLong(entry.getValue().toString())
+                    ));
+        } catch (Exception e) {
+            log.error("Failed to get {} statistics for code: {}, date: {}", type, code, date, e);
+            return Collections.emptyMap();
+        }
+    }
+
+    private String extractCodeFromKey(String key) {
+        // url:hourly:access:{2025-09-15}:abc123 → abc123
+        if (key == null || key.isEmpty()) {
             return null;
         }
-    }
 
-    @Override
-    public Set<String> findDailyStatisticsKeys(LocalDate date) {
-        String dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
-        String pattern = DAILY_STATS_KEY_PREFIX + "*:" + dateKey;
-        
-        ScanOptions scanOptions = ScanOptions.scanOptions()
-                .match(pattern)
-                .count(1000)
-                .build();
-        
-        Set<String> matchingKeys = new HashSet<>();
-        try (Cursor<String> cursor = redisTemplate.scan(scanOptions)) {
-            while (cursor.hasNext()) {
-                matchingKeys.add(cursor.next());
-            }
-        } catch (Exception e) {
-            log.error("Failed to scan daily statistics keys for date: {}", date, e);
-            return Collections.emptySet();
+        int lastColonIndex = key.lastIndexOf(':');
+        if (lastColonIndex > 0 && lastColonIndex < key.length() - 1) {
+            return key.substring(lastColonIndex + 1);
         }
-        
-        return matchingKeys;
-    }
 
-    @Override
-    public Map<Object, Object> getDailyStatistics(String key) {
-        Map<Object, Object> stats = redisTemplate.opsForHash().entries(key);
-        return stats != null ? stats : Collections.emptyMap();
+        return null;
     }
 }
