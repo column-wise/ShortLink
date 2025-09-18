@@ -1,4 +1,7 @@
 // Root project configuration for multi-module setup
+plugins {
+    id 'io.spring.dependency-management' version '1.1.7' apply false
+}
 allprojects {
     group = 'io.github.columnwise'
     version = '0.0.1-SNAPSHOT'
@@ -10,13 +13,20 @@ allprojects {
 
 subprojects {
     apply plugin: 'java'
-    
+    apply plugin: 'io.spring.dependency-management'
+
     java {
         toolchain {
             languageVersion = JavaLanguageVersion.of(21)
         }
     }
-    
+
+    dependencyManagement {
+        imports {
+            mavenBom "org.springframework.boot:spring-boot-dependencies:3.5.4"
+        }
+    }
+
     configurations {
         compileOnly {
             extendsFrom annotationProcessor
