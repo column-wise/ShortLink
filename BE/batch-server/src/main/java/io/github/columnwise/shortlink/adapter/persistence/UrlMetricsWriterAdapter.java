@@ -44,7 +44,7 @@ public class UrlMetricsWriterAdapter implements UrlMetricsWriterPort {
         String sql = """
             INSERT INTO url_metrics_hourly
             (code, day, hour, accesses, unique_visitors, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
             accesses = VALUES(accesses),
             unique_visitors = VALUES(unique_visitors),
