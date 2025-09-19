@@ -111,6 +111,7 @@ public class ShortUrlController {
 		HttpServletRequest request
 	) {
 		// 로드밸런서 환경을 고려한 클라이언트 정보 추출
+		// todo IP 주소 형식 검증, user-agent 길이 제한
 		String clientIp = ClientInfoExtractor.getClientIp(request);
 		String userAgent = request.getHeader("User-Agent");
 		String browserFamily = ClientInfoExtractor.extractBrowserFamily(userAgent);
