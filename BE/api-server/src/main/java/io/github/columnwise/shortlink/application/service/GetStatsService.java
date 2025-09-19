@@ -9,6 +9,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import io.github.columnwise.shortlink.domain.service.RedisKeyManager;
 
+import java.time.Clock;
 import java.time.LocalDate;
 
 /**
@@ -27,33 +28,34 @@ import java.time.LocalDate;
 @RequiredArgsConstructor
 public class GetStatsService implements GetStatsUseCase {
 
-    private final ShortUrlRepositoryPort shortUrlRepositoryPort;
-    private final RedisTemplate<String, Object> redisTemplate;
+	private final ShortUrlRepositoryPort shortUrlRepositoryPort;
+	private final RedisTemplate<String, Object> redisTemplate;
+	private final Clock clock;
 
-    /**
-     * 특정 단축 URL의 누적 통계를 조회합니다.
-     *
-     * @param code 단축 코드
-     * @return URL 누적 통계 정보
-     * @throws UrlNotFoundException 단축 코드가 존재하지 않는 경우
-     */
-    @Override
-    public UrlMetrics getUrlMetrics(String code) {
-        // 먼저 코드가 존재하는지 확인
-        shortUrlRepositoryPort.findByCode(code)
-            .orElseThrow(() -> new UrlNotFoundException("URL not found for code: " + code));
+	/**
+	 * 특정 단축 URL의 누적 통계를 조회합니다.
+	 *
+	 * @param code 단축 코드
+	 * @return URL 누적 통계 정보
+	 * @throws UrlNotFoundException 단축 코드가 존재하지 않는 경우
+	 */
+	@Override
+	public UrlMetrics getUrlMetrics(String code) {
+		// 먼저 코드가 존재하는지 확인
+		shortUrlRepositoryPort.findByCode(code)
+				.orElseThrow(() -> new UrlNotFoundException("URL not found for code: " + code));
 
-        // TODO: 실제 구현에서는 DB의 누적 통계 + 오늘 Redis 통계를 조합
-        // 현재는 간단한 구현으로 Redis 데이터만 사용
-        LocalDate today = LocalDate.now();
-        String todayKey = RedisKeyManager.getAccessCountKey(code, today);
+		LocalDate today = LocalDate.now(clock);
+		String hourlyKey = RedisKeyManager.getHourlyAccessKey(code, today);
+		java.util.Map<Object, Object> entries = redisTemplate.opsForHash().entries(hourlyKey);
+		long todayCount = entries.values().stream()
+				.map(Object::toString)
+				.mapToLong(Long::parseLong)
+				.sum();
 
-        Long todayCount = redisTemplate.opsForValue().get(todayKey) != null ?
-            Long.parseLong(redisTemplate.opsForValue().get(todayKey).toString()) : 0L;
-
-        return UrlMetrics.builder()
-            .code(code)
-            .totalAccesses(todayCount) // TODO: DB 누적값 + 오늘 Redis 값으로 변경 필요
-            .build();
-    }
+		return UrlMetrics.builder()
+				.code(code)
+				.totalAccesses(todayCount)
+				.build();
+	}
 }

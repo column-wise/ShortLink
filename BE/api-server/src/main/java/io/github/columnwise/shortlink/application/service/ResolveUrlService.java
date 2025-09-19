@@ -123,7 +123,7 @@ public class ResolveUrlService implements ResolveUrlUseCase {
 
         List<String> keys = List.of(hourlyKey, uniqueKey, uaKey, deviceKey);
         List<String> args = List.of(String.format("%02d", hour), visitorHash, ua, device,
-                String.valueOf(Duration.ofDays(properties.getDefaultExpirationDays()).toSeconds()));
+                String.valueOf(Duration.ofDays(properties.getVisitStatisticsTtlDays()).toSeconds()));
 
         redisTemplate.execute(recordVisitScript, keys, args.toArray());
     }
