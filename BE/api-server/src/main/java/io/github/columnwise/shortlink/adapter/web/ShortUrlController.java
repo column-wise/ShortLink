@@ -6,7 +6,8 @@ import io.github.columnwise.shortlink.application.port.in.CreateShortUrlUseCase;
 import io.github.columnwise.shortlink.application.port.in.GetStatsUseCase;
 import io.github.columnwise.shortlink.application.port.in.ResolveUrlUseCase;
 import io.github.columnwise.shortlink.domain.model.ShortUrl;
-import io.github.columnwise.shortlink.domain.model.DailyStatistics;
+import io.github.columnwise.shortlink.domain.model.UrlMetrics;
+import io.github.columnwise.shortlink.util.ClientInfoExtractor;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
@@ -28,9 +29,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.view.RedirectView;
+import jakarta.servlet.http.HttpServletRequest;
 
-import java.time.LocalDate;
-import java.util.List;
 
 /**
  * URL 단축 서비스 REST API 컴트롤러
@@ -56,7 +56,7 @@ public class ShortUrlController {
 	private final CreateShortUrlUseCase createShortUrlUseCase;
 	private final ResolveUrlUseCase resolveUrlUseCase;
 	private final GetStatsUseCase getStatsUseCase;
-	
+
 	@Value("${server.url}")
 	private String serverUrl;
 
@@ -81,12 +81,12 @@ public class ShortUrlController {
 		@Valid @RequestBody CreateShortUrlRequest request
 	) {
 		ShortUrl shortUrl = createShortUrlUseCase.createShortUrl(request.longUrl());
-		
+
 		CreateShortUrlResponse response = new CreateShortUrlResponse(
 				shortUrl.code(),
 				serverUrl + "/api/v1/r/" + shortUrl.code()
 		);
-		
+
 		return ResponseEntity.status(HttpStatus.CREATED).body(response);
 	}
 
@@ -107,60 +107,41 @@ public class ShortUrlController {
 	})
 	public RedirectView redirectToOriginalUrl(
 		@Parameter(description = "단축 코드", required = true, example = "abc123")
-		@PathVariable("code") String code
+		@PathVariable("code") String code,
+		HttpServletRequest request
 	) {
-		String longUrl = resolveUrlUseCase.resolveUrl(code);
+		// 로드밸런서 환경을 고려한 클라이언트 정보 추출
+		// todo IP 주소 형식 검증, user-agent 길이 제한
+		String clientIp = ClientInfoExtractor.getClientIp(request);
+		String userAgent = request.getHeader("User-Agent");
+		String browserFamily = ClientInfoExtractor.extractBrowserFamily(userAgent);
+		String deviceType = ClientInfoExtractor.extractDeviceType(userAgent);
+
+		String longUrl = resolveUrlUseCase.resolveUrl(code, clientIp, browserFamily, deviceType);
 		return new RedirectView(longUrl);
 	}
 
-	@GetMapping("/urls/{code}/stats")
+	@GetMapping("/urls/{code}/metrics")
 	@Operation(
-		summary = "URL 일별 접속 통계 조회",
-		description = "특정 단축 URL의 일별 접속 통계 목록을 조회합니다. 프론트엔드에서 시간대별, 요일별 분석이 가능합니다."
+		summary = "URL 누적 통계 조회",
+		description = "특정 단축 URL의 누적 통계 정보를 조회합니다. 총 조회수, 오늘 조회수 등의 요약 정보를 제공합니다."
 	)
 	@ApiResponses({
 		@ApiResponse(
 			responseCode = "200",
 			description = "통계 조회 성공",
-			content = @Content(array = @ArraySchema(schema = @Schema(implementation = DailyStatistics.class)))
-		),
-		@ApiResponse(
-			responseCode = "400",
-			description = "잘못된 요청 (잘못된 날짜 형식 또는 날짜 범위 오류)"
+			content = @Content(schema = @Schema(implementation = UrlMetrics.class))
 		),
 		@ApiResponse(
 			responseCode = "404",
 			description = "존재하지 않는 단축 코드"
 		)
 	})
-	public ResponseEntity<List<DailyStatistics>> getDailyStatistics(
+	public ResponseEntity<UrlMetrics> getUrlMetrics(
 		@Parameter(description = "단축 코드", required = true, example = "abc123")
-		@PathVariable("code") String code,
-		
-		@Parameter(description = "시작 날짜 (YYYY-MM-DD, 생략시 30일 전)", example = "2024-01-01")
-		@RequestParam(required = false) 
-		@org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
-		LocalDate startDate,
-		
-		@Parameter(description = "종료 날짜 (YYYY-MM-DD, 생략시 오늘)", example = "2024-01-31")
-		@RequestParam(required = false)
-		@org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
-		LocalDate endDate
+		@PathVariable("code") String code
 	) {
-		// 기본값 처리와 검증
-		if (startDate == null) {
-			startDate = LocalDate.now().minusDays(30);
-		}
-		if (endDate == null) {
-			endDate = LocalDate.now();
-		}
-		
-		// 날짜 범위 검증: 시작일이 종료일보다 늦으면 안됨
-		if (startDate.isAfter(endDate)) {
-			throw new IllegalArgumentException("Start date cannot be after end date");
-		}
-		
-		List<DailyStatistics> statistics = getStatsUseCase.getDailyStatistics(code, startDate, endDate);
-		return ResponseEntity.ok(statistics);
+		UrlMetrics metrics = getStatsUseCase.getUrlMetrics(code);
+		return ResponseEntity.ok(metrics);
 	}
 }

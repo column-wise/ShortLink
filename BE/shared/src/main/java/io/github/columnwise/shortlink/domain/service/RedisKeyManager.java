@@ -8,65 +8,32 @@ import java.time.format.DateTimeFormatter;
  * Hash Tag를 사용하여 관련 키들을 같은 슬롯에 배치
  */
 public class RedisKeyManager {
-    
+
     // Hash Tag를 사용하여 같은 날짜 데이터를 같은 슬롯에 배치
-    private static final String ACCESS_COUNT_KEY_TEMPLATE = "url:access:count:{%s}:%s";
-    private static final String DAILY_STATS_KEY_TEMPLATE = "url:daily:stats:{%s}:%s";
-    private static final String TOTAL_ACCESS_KEY_TEMPLATE = "url:total:access:{%s}:%s";
-    private static final String LAST_ACCESS_KEY_TEMPLATE = "url:last:access:{%s}:%s";
-    
-    // 키 목록 관리를 위한 SET
-    private static final String ACCESS_CODES_SET_TEMPLATE = "url:access:codes:{%s}";
-    private static final String DAILY_CODES_SET_TEMPLATE = "url:daily:codes:{%s}";
-    
-    // 분산 락
-    private static final String BATCH_LOCK_KEY_TEMPLATE = "batch:lock:aggregation:{%s}";
-    private static final String PROCESSED_MARKER_TEMPLATE = "batch:processed:{%s}:%s";
-    private static final String PROCESSING_MARKER_TEMPLATE = "batch:processing:{%s}:%s";
-    
-    public static String getAccessCountKey(String code, LocalDate date) {
+    // url:hourly:access:{2025-09-15}:example
+    private static final String HOURLY_ACCESS_KEY_TEMPLATE = "url:hourly:access:{%s}:%s";
+    private static final String DAILY_UNIQUE_kEY_TEMPLATE = "url:daily:unique:{%s}:%s";
+    private static final String DAILY_USER_AGENT_kEY_TEMPLATE = "url:daily:ua:{%s}:%s";
+    private static final String DAILY_DEVICE_kEY_TEMPLATE = "url:daily:device:{%s}:%s";
+
+    public static String getHourlyAccessKey(String code, LocalDate date) {
         String dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
-        return String.format(ACCESS_COUNT_KEY_TEMPLATE, dateKey, code);
+        return String.format(HOURLY_ACCESS_KEY_TEMPLATE, dateKey, code);
     }
-    
-    public static String getDailyStatsKey(String code, LocalDate date) {
+
+    public static String getDailyUniqueKey(String code, LocalDate date) {
         String dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
-        return String.format(DAILY_STATS_KEY_TEMPLATE, dateKey, code);
+        return String.format(DAILY_UNIQUE_kEY_TEMPLATE, dateKey, code);
     }
-    
-    public static String getTotalAccessKey(String code, LocalDate date) {
+
+    public static String getDailyUaKey(String code, LocalDate date) {
         String dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
-        return String.format(TOTAL_ACCESS_KEY_TEMPLATE, dateKey, code);
+        return String.format(DAILY_USER_AGENT_kEY_TEMPLATE, dateKey, code);
     }
-    
-    public static String getLastAccessKey(String code, LocalDate date) {
+
+    public static String getDailyDeviceKey(String code, LocalDate date) {
         String dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
-        return String.format(LAST_ACCESS_KEY_TEMPLATE, dateKey, code);
-    }
-    
-    public static String getAccessCodesSetKey(LocalDate date) {
-        String dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
-        return String.format(ACCESS_CODES_SET_TEMPLATE, dateKey);
-    }
-    
-    public static String getDailyCodesSetKey(LocalDate date) {
-        String dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
-        return String.format(DAILY_CODES_SET_TEMPLATE, dateKey);
-    }
-    
-    public static String getBatchLockKey(LocalDate date) {
-        String dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
-        return String.format(BATCH_LOCK_KEY_TEMPLATE, dateKey);
-    }
-    
-    public static String getProcessedMarkerKey(String code, LocalDate date) {
-        String dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
-        return String.format(PROCESSED_MARKER_TEMPLATE, dateKey, code);
-    }
-    
-    public static String getProcessingMarkerKey(String code, LocalDate date) {
-        String dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
-        return String.format(PROCESSING_MARKER_TEMPLATE, dateKey, code);
+        return String.format(DAILY_DEVICE_kEY_TEMPLATE, dateKey, code);
     }
     
     /**
@@ -149,36 +116,5 @@ public class RedisKeyManager {
      */
     public static boolean isHashTagKey(String key) {
         return key != null && key.contains("{") && key.contains("}");
-    }
-    
-    /**
-     * 레거시 키를 Hash Tag 형태로 변환
-     * 
-     * @param legacyKey 레거시 키
-     * @param date 날짜
-     * @return Hash Tag 형태 키
-     */
-    public static String convertToHashTagKey(String legacyKey, LocalDate date) {
-        if (legacyKey == null || isHashTagKey(legacyKey)) {
-            return legacyKey;
-        }
-        
-        String code = extractCodeFromKey(legacyKey);
-        String dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
-        
-        // 키 타입에 따라 적절한 Hash Tag 형태로 변환
-        if (legacyKey.contains("hitcount") || legacyKey.contains("access:count")) {
-            return getAccessCountKey(code, date);
-        } else if (legacyKey.contains("daily:stats")) {
-            return getDailyStatsKey(code, date);
-        } else if (legacyKey.contains("total:access")) {
-            return getTotalAccessKey(code, date);
-        } else if (legacyKey.contains("last:access")) {
-            return getLastAccessKey(code, date);
-        }
-        
-        // 기본 변환: prefix:{date}:code
-        String prefix = legacyKey.split(":")[0];
-        return String.format("%s:{%s}:%s", prefix, dateKey, code);
     }
 }
