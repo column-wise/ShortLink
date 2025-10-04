@@ -93,10 +93,15 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleIllegalArgumentException(IllegalArgumentException ex) {
-        log.warn("[400] IllegalArgumentException", ex);
+        log.warn("[400] IllegalArgumentException: {}", ex.getMessage());
         Map<String, String> error = new HashMap<>();
         error.put("error", "BAD_REQUEST");
-        error.put("message", "Invalid request parameters");
+        // 스킴 검증 오류인 경우 구체적인 메시지 제공
+        if (ex.getMessage() != null && ex.getMessage().contains("스킴")) {
+            error.put("message", ex.getMessage());
+        } else {
+            error.put("message", "Invalid request parameters");
+        }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 

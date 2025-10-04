@@ -7,6 +7,7 @@ import io.github.columnwise.shortlink.domain.exception.CodeCollisionException;
 import io.github.columnwise.shortlink.domain.model.ShortUrl;
 import io.github.columnwise.shortlink.domain.service.CodeGenerator;
 import io.github.columnwise.shortlink.util.HashUtils;
+import io.github.columnwise.shortlink.util.UriSchemeValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -60,6 +61,11 @@ public class CreateShortUrlService implements CreateShortUrlUseCase {
     @Override
     @Transactional(readOnly = true)
     public ShortUrl createShortUrl(String longUrl) {
+
+        // URI 스킴 검증 - DB 저장 전에 수행
+        if (!UriSchemeValidator.isValidScheme(longUrl, properties.getAllowedSchemes())) {
+            throw new IllegalArgumentException("유효하지 않은 URL 스킴입니다. 허용되는 스킴: " + properties.getAllowedSchemes());
+        }
 
         // 로깅용 URL 마스킹 처리
         // 보안상 민감할 수 있는 URL 정보를 마스킹하여 기록
