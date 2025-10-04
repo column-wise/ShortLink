@@ -2,6 +2,7 @@ package io.github.columnwise.shortlink.adapter.web;
 
 import io.github.columnwise.shortlink.domain.exception.UrlNotFoundException;
 import io.github.columnwise.shortlink.domain.exception.CodeCollisionException;
+import io.github.columnwise.shortlink.domain.exception.InvalidUriSchemeException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -68,6 +69,21 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 유효하지 않은 URI 스킴 예외를 처리합니다.
+     *
+     * @param ex InvalidUriSchemeException 예외
+     * @return 400 Bad Request 응답
+     */
+    @ExceptionHandler(InvalidUriSchemeException.class)
+    public ResponseEntity<Map<String, String>> handleInvalidUriSchemeException(InvalidUriSchemeException ex) {
+        log.warn("[400] Invalid URI scheme: {}", ex.getMessage());
+        Map<String, String> error = new HashMap<>();
+        error.put("error", "INVALID_URI_SCHEME");
+        error.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /**
      * 요청 데이터 유효성 검증 실패 예외를 처리합니다.
      *
      * @param ex MethodArgumentNotValidException 예외
@@ -93,7 +109,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleIllegalArgumentException(IllegalArgumentException ex) {
-        log.warn("[400] IllegalArgumentException", ex);
+        log.warn("[400] IllegalArgumentException: {}", ex.getMessage());
         Map<String, String> error = new HashMap<>();
         error.put("error", "BAD_REQUEST");
         error.put("message", "Invalid request parameters");

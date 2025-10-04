@@ -16,6 +16,7 @@ import org.springframework.validation.annotation.Validated;
  * <pre>
  * app.shorturl.max-retries=5
  * app.shorturl.default-expiration-days=365
+ * app.shorturl.allowed-schemes=http,https,mailto
  * </pre>
  *
  * <p>모든 설정값은 Bean Validation을 통해 검증됩니다.</p>
@@ -50,4 +51,12 @@ public class ShortUrlProperties {
      */
     @Positive(message = "visitStatisticsTtlDays must be positive")
     private long visitStatisticsTtlDays = 2;
+
+    /**
+     * 허용되는 URL 스킴 목록
+     *
+     * <p>리다이렉트 시 허용할 URL 스킴들의 목록입니다.
+     * 보안상 안전한 스킴만 포함해야 합니다.</p>
+     */
+    private java.util.Set<String> allowedSchemes = java.util.Set.of("http", "https", "mailto");
 }

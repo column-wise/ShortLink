@@ -28,8 +28,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.view.RedirectView;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpHeaders;
 
 
 /**
@@ -105,7 +105,7 @@ public class ShortUrlController {
 			description = "존재하지 않는 단축 코드"
 		)
 	})
-	public RedirectView redirectToOriginalUrl(
+	public ResponseEntity<Void> redirectToOriginalUrl(
 		@Parameter(description = "단축 코드", required = true, example = "abc123")
 		@PathVariable("code") String code,
 		HttpServletRequest request
@@ -118,7 +118,10 @@ public class ShortUrlController {
 		String deviceType = ClientInfoExtractor.extractDeviceType(userAgent);
 
 		String longUrl = resolveUrlUseCase.resolveUrl(code, clientIp, browserFamily, deviceType);
-		return new RedirectView(longUrl);
+
+		return ResponseEntity.status(HttpStatus.FOUND)
+				.header(HttpHeaders.LOCATION, longUrl)
+				.build();
 	}
 
 	@GetMapping("/urls/{code}/metrics")
