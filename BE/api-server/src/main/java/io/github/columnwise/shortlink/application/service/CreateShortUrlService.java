@@ -4,6 +4,7 @@ import io.github.columnwise.shortlink.application.port.in.CreateShortUrlUseCase;
 import io.github.columnwise.shortlink.application.port.out.ShortUrlRepositoryPort;
 import io.github.columnwise.shortlink.config.ShortUrlProperties;
 import io.github.columnwise.shortlink.domain.exception.CodeCollisionException;
+import io.github.columnwise.shortlink.domain.exception.InvalidUriSchemeException;
 import io.github.columnwise.shortlink.domain.model.ShortUrl;
 import io.github.columnwise.shortlink.domain.service.CodeGenerator;
 import io.github.columnwise.shortlink.util.HashUtils;
@@ -64,7 +65,7 @@ public class CreateShortUrlService implements CreateShortUrlUseCase {
 
         // URI 스킴 검증 - DB 저장 전에 수행
         if (!UriSchemeValidator.isValidScheme(longUrl, properties.getAllowedSchemes())) {
-            throw new IllegalArgumentException("유효하지 않은 URL 스킴입니다. 허용되는 스킴: " + properties.getAllowedSchemes());
+            throw new InvalidUriSchemeException("유효하지 않은 URL 스킴입니다. 허용되는 스킴: " + properties.getAllowedSchemes());
         }
 
         // 로깅용 URL 마스킹 처리

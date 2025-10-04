@@ -8,6 +8,7 @@ import io.github.columnwise.shortlink.util.HashUtils;
 import io.github.columnwise.shortlink.util.UriSchemeValidator;
 import org.springframework.data.redis.core.RedisTemplate;
 import io.github.columnwise.shortlink.domain.exception.UrlNotFoundException;
+import io.github.columnwise.shortlink.domain.exception.InvalidUriSchemeException;
 import io.github.columnwise.shortlink.domain.model.ShortUrl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -94,7 +95,7 @@ public class ResolveUrlService implements ResolveUrlUseCase {
 
         // URI 스킴 검증 - 통계 기록 전에 수행
         if (!UriSchemeValidator.isValidScheme(shortUrl.longUrl(), properties.getAllowedSchemes())) {
-            throw new UrlNotFoundException("유효하지 않은 URL 스킴입니다. 허용되는 스킴: " + properties.getAllowedSchemes());
+            throw new InvalidUriSchemeException("유효하지 않은 URL 스킴입니다. 허용되는 스킴: " + properties.getAllowedSchemes());
         }
 
         // 검증 통과한 경우에만 Redis에 타임스탬프 기반 방문 기록 저장

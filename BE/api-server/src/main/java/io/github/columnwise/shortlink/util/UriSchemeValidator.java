@@ -23,6 +23,7 @@ public class UriSchemeValidator {
 
     /**
      * 차단해야 할 위험한 URI 스킴 목록 (로깅용)
+     * 주로 XSS, CSRF, 로컬 파일 접근 등의 보안 위험이 있는 스킴들
      */
     private static final Set<String> DANGEROUS_SCHEMES = Set.of(
             "javascript",
@@ -33,12 +34,7 @@ public class UriSchemeValidator {
             "chrome",
             "chrome-extension",
             "ms-appx",
-            "ms-appx-web",
-            "ftp",
-            "sftp",
-            "mailto",
-            "tel",
-            "sms"
+            "ms-appx-web"
     );
 
     /**
