@@ -8,6 +8,7 @@ import io.github.columnwise.shortlink.application.port.in.ResolveUrlUseCase;
 import io.github.columnwise.shortlink.domain.model.ShortUrl;
 import io.github.columnwise.shortlink.domain.model.UrlMetrics;
 import io.github.columnwise.shortlink.util.ClientInfoExtractor;
+import io.github.columnwise.shortlink.util.UriSchemeValidator;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
@@ -30,6 +31,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.view.RedirectView;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpHeaders;
 
 
 /**
@@ -101,11 +103,15 @@ public class ShortUrlController {
 			description = "원본 URL로 리다이렉트 성공"
 		),
 		@ApiResponse(
+			responseCode = "400",
+			description = "유효하지 않은 URL 스킴 (HTTP/HTTPS만 허용)"
+		),
+		@ApiResponse(
 			responseCode = "404",
 			description = "존재하지 않는 단축 코드"
 		)
 	})
-	public RedirectView redirectToOriginalUrl(
+	public ResponseEntity<?> redirectToOriginalUrl(
 		@Parameter(description = "단축 코드", required = true, example = "abc123")
 		@PathVariable("code") String code,
 		HttpServletRequest request
@@ -118,7 +124,16 @@ public class ShortUrlController {
 		String deviceType = ClientInfoExtractor.extractDeviceType(userAgent);
 
 		String longUrl = resolveUrlUseCase.resolveUrl(code, clientIp, browserFamily, deviceType);
-		return new RedirectView(longUrl);
+
+		// URI 스킴 검증 - 안전한 프로토콜만 허용
+		if (!UriSchemeValidator.isValidScheme(longUrl)) {
+			return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+					.header(HttpHeaders.CONTENT_TYPE, "text/plain")
+					.body("Invalid URL scheme. Only HTTP and HTTPS are allowed.");
+		}
+
+		RedirectView redirectView = new RedirectView(longUrl);
+		return ResponseEntity.status(HttpStatus.FOUND).body(redirectView);
 	}
 
 	@GetMapping("/urls/{code}/metrics")
