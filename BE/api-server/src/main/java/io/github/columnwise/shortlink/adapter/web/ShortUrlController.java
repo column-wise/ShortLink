@@ -111,7 +111,7 @@ public class ShortUrlController {
 			description = "존재하지 않는 단축 코드"
 		)
 	})
-	public ResponseEntity<?> redirectToOriginalUrl(
+	public Object redirectToOriginalUrl(
 		@Parameter(description = "단축 코드", required = true, example = "abc123")
 		@PathVariable("code") String code,
 		HttpServletRequest request
@@ -132,8 +132,7 @@ public class ShortUrlController {
 					.body("Invalid URL scheme. Only HTTP and HTTPS are allowed.");
 		}
 
-		RedirectView redirectView = new RedirectView(longUrl);
-		return ResponseEntity.status(HttpStatus.FOUND).body(redirectView);
+		return new RedirectView(longUrl);
 	}
 
 	@GetMapping("/urls/{code}/metrics")
