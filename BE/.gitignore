@@ -33,3 +33,4 @@ out/
 ### Claude ###
 .claude/
 AGENTS.md
+dev.env
