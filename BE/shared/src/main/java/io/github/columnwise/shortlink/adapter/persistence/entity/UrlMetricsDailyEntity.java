@@ -18,7 +18,8 @@ import java.time.LocalDateTime;
  * - Batch: 시간별 데이터를 일별로 집계하여 저장
  */
 @Entity
-@Table(name = "url_metrics_daily")
+@Table(name = "url_metrics_daily",
+    uniqueConstraints = @UniqueConstraint(columnNames = {"code", "day"}))
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class UrlMetricsDailyEntity {
 
