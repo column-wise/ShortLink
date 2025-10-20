@@ -22,7 +22,7 @@ public class DevStatisticsScheduler {
     @Scheduled(fixedDelayString = "60000", initialDelayString = "15000")
     public void aggregateHourlyDev() {
         try {
-            int processed = hourlyUseCase.processCurrentHour();
+            int processed = hourlyUseCase.processPreviousHour();
             if (processed > 0) {
                 log.info("[DevHourlyAggregation] processed={} items", processed);
             }

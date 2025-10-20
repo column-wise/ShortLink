@@ -12,10 +12,10 @@ import java.util.List;
 public interface ProcessHourlyStatisticsUseCase {
 
     /**
-     * 현재 시간의 모든 코드에 대해 시간별 통계를 처리합니다.
+     * 직전 1시간의 모든 코드에 대해 시간별 통계를 처리합니다.
      * 현재 시간 - 1시간의 통계를 처리합니다.
      *
      * @return 처리된 코드 수
      */
-    int processCurrentHour();
+    int processPreviousHour();
 }
