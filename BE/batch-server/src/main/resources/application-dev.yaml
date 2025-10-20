@@ -9,21 +9,9 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: true
-    open-in-view: false
-    properties:
-      hibernate:
-        format_sql: true
 
   data:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
 
-server:
-  url: ${SERVER_URL:http://localhost:8080}
-  port: 8080
-
-logging:
-  level:
-    io.github.columnwise.shortlink: DEBUG
-    org.springframework.data.redis: INFO
