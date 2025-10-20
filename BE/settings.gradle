@@ -1,4 +1,4 @@
-rootProject.name = 'ShortLink'
+rootProject.name = 'short-link'
 
 include 'api-server'
 include 'batch-server'
