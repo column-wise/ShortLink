@@ -1,5 +1,3 @@
 rootProject.name = 'short-link'
 
 include 'api-server'
-include 'batch-server'
-include 'shared'

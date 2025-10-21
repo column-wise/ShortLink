@@ -49,18 +49,7 @@ services:
     ports:
       - "8080:8080"
 
-  batch-server:
-    build:
-      context: .
-      dockerfile: batch-server/Dockerfile
-    container_name: shortlink-batch
-    env_file:
-      - dev.env
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+  # batch-server 제거됨 (Kafka + OLAP 전환)
 
 volumes:
   mysql-data:
