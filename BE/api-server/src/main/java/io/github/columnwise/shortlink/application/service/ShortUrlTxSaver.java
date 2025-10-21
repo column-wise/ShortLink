@@ -59,6 +59,7 @@ class ShortUrlTxSaver {
                 .longUrl(longUrl)
                 .createdAt(now)
                 .expiresAt(now.plus(properties.getDefaultExpirationDays(), ChronoUnit.DAYS))
+                .isActive(true)
                 .build();
 
         return shortUrlRepository.save(shortUrl);
