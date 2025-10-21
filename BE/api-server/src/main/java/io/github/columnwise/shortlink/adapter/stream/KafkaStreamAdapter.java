@@ -20,7 +20,7 @@ public class KafkaStreamAdapter implements StreamPort {
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
-    @Value("${app.kafka.topics.link-hits:link_hits}")
+    @Value("${app.kafka.topics.linkHits:link_hits}")
     private String linkHitsTopic;
 
     @Override
@@ -43,4 +43,3 @@ public class KafkaStreamAdapter implements StreamPort {
         }
     }
 }
-
