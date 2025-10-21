@@ -8,6 +8,8 @@ import io.github.columnwise.shortlink.util.UriSchemeValidator;
 import io.github.columnwise.shortlink.domain.exception.UrlNotFoundException;
 import io.github.columnwise.shortlink.domain.exception.InvalidUriSchemeException;
 import io.github.columnwise.shortlink.domain.model.ShortUrl;
+import io.github.columnwise.shortlink.application.port.out.StreamPort;
+import io.github.columnwise.shortlink.domain.event.VisitEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -32,6 +34,7 @@ public class ResolveUrlService implements ResolveUrlUseCase {
     private final ShortUrlRepositoryPort shortUrlRepository;
     private final ShortUrlProperties properties;
     private final Clock clock;
+    private final StreamPort streamPort;
     // TODO(kafka): 방문 이벤트를 Kafka 토픽으로 발행하도록 전환 예정
     
     /**
@@ -54,16 +57,29 @@ public class ResolveUrlService implements ResolveUrlUseCase {
             throw new InvalidUriSchemeException("유효하지 않은 URL 스킴입니다. 허용되는 스킴: " + properties.getAllowedSchemes());
         }
 
-        // 검증 통과한 경우 방문 이벤트를 비동기로 전송(추후 Kafka 연동)
-        // publishVisitEvent(code, ip, uaFamily, deviceType);
+        // 검증 통과한 경우 방문 이벤트를 비동기로 전송
+        publishVisitEvent(code, ip, uaFamily, deviceType, null);
 
         return shortUrl.longUrl();
     }
     
     /**
-     * 방문 이벤트를 비동기 스트림으로 전송합니다(Kafka 연동 예정).
+     * 방문 이벤트를 비동기 스트림으로 전송합니다.
      */
-    private void publishVisitEvent(String code, String ip, String uaFamily, String deviceType) {
-        // placeholder: Kafka 프로듀서 연동 예정
+    private void publishVisitEvent(String code, String ip, String uaFamily, String deviceType, String referer) {
+        String ua = (uaFamily == null || uaFamily.isBlank()) ? "unknown" : uaFamily;
+        String device = (deviceType == null || deviceType.isBlank()) ? "unknown" : deviceType;
+        String visitorHash = HashUtils.sha256((ip == null ? "" : ip) + "|" + ua);
+
+        VisitEvent event = new VisitEvent(
+                java.util.UUID.randomUUID().toString(),
+                code,
+                visitorHash,
+                ua,
+                device,
+                referer,
+                clock.instant()
+        );
+        streamPort.publish(event);
     }
 }
