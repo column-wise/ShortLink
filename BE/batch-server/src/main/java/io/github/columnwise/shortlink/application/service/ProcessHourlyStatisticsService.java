@@ -27,7 +27,7 @@ public class ProcessHourlyStatisticsService implements ProcessHourlyStatisticsUs
 
 	@Override
 	@Transactional
-	public int processCurrentHour() {
+	public int processPreviousHour() {
 		LocalDateTime now = LocalDateTime.now();
 		LocalDateTime previousHour = now.minusHours(1);
 		LocalDate targetDate = previousHour.toLocalDate();
