@@ -21,7 +21,7 @@ public class DistributedStatisticsJobScheduler {
     @Scheduled(cron = "0 5 * * * *")
     public void aggregateHourly() {
         try {
-            int processed = hourlyUseCase.processCurrentHour();
+            int processed = hourlyUseCase.processPreviousHour();
             log.info("[HourlyAggregation] processed={} items", processed);
         } catch (Exception e) {
             log.error("[HourlyAggregation] failed", e);
