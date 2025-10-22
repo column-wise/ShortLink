@@ -47,11 +47,9 @@ services:
       redis:
         condition: service_healthy
       kafka:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "8080:8080"
-
-  # batch-server 제거됨 (Kafka + OLAP 전환)
 
   kafka:
     image: apache/kafka:3.7.0
@@ -60,6 +58,11 @@ services:
       - dev.env
     ports:
       - "9092:9092"
+    healthcheck:
+      test: ["CMD", "/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "kafka:9092", "--list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     environment:
       # KRaft 단일 노드 설정
       KAFKA_NODE_ID: 1
