@@ -95,9 +95,13 @@ flowchart LR
     A4[API #4]
   end
 
-  subgraph Batch[Batch Servers]
-    B1[Batch #1]
-    B2[Batch #2]
+  subgraph Kafka[Kafka]
+    K[(Broker)]
+  end
+
+  subgraph Consumers[Events Consumers]
+    EC1[Consumer #1]
+    EC2[Consumer #2]
   end
 
   subgraph Redis[Redis High Availability]
@@ -129,20 +133,23 @@ flowchart LR
   A3 -->|cache read| RR2
   A4 -->|cache read| RR2
 
-  B1 -->|statistics/lock| RM
-  B2 -->|statistics/lock| RM
+  A1 -->|produce link_hits| K
+  A2 -->|produce link_hits| K
+  A3 -->|produce link_hits| K
+  A4 -->|produce link_hits| K
 
-  A1 -->|DB read/write| DBR
-  A2 -->|DB read/write| DBR
-  A3 -->|DB read/write| DBR
-  A4 -->|DB read/write| DBR
+  K -->|consume link_hits| EC1
+  K -->|consume link_hits| EC2
 
-  B1 -->|statistics write| DBW
-  B2 -->|statistics write| DBW
-
-  B1 -.->|distributed lock| B2
-
+  EC1 -->|statistics write| DBW
+  EC2 -->|statistics write| DBW
 ```
+
+Architecture notes: API servers produce visit events to Kafka (`link_hits`).
+Events Consumers (replacing the previous batch servers) consume and persist
+aggregations or logs to the database. Redis remains the central cache/counter
+and distributed lock provider. While local development may run single instances,
+the target architecture is distributed and highly available as shown above.
 
 ## 🚀 주요 기능
 
