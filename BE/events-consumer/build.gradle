@@ -30,7 +30,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-json'
 
     // Optional: ClickHouse client (placeholder for future OLAP write)
-    implementation 'com.clickhouse:clickhouse-jdbc:0.6.2'
+    implementation 'com.clickhouse:clickhouse-jdbc:0.9.2'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok'
