@@ -28,11 +28,14 @@ import java.time.Instant;
  */
 @Builder
 public record ShortUrl(
-		long id,
+		Long id,
 		String code,
 		String longUrl,
 		Instant createdAt,
 		Instant expiresAt,
-		boolean isActive
+		Boolean isActive
 ) {
+    public ShortUrl {
+        isActive = (isActive != null) ? isActive : true;
+    }
 }
