@@ -20,14 +20,6 @@ public class RedisProperties {
     @NotNull
     private Cache cache = new Cache();
     
-    @Valid
-    @NotNull
-    private HitCounter hitCounter = new HitCounter();
-    
-    @Valid
-    @NotNull
-    private Lock lock = new Lock();
-    
     @Data
     public static class Cache {
         @NotBlank(message = "Cache key prefix cannot be blank")
@@ -35,20 +27,5 @@ public class RedisProperties {
         
         @NotNull(message = "Cache default TTL cannot be null")
         private Duration defaultTtl = Duration.ofMinutes(30);
-    }
-    
-    @Data
-    public static class HitCounter {
-        @NotBlank(message = "HitCounter key prefix cannot be blank")
-        private String keyPrefix = "hitcount:";
-    }
-    
-    @Data
-    public static class Lock {
-        @NotBlank(message = "Lock key prefix cannot be blank")
-        private String keyPrefix = "lock:";
-        
-        @NotNull(message = "Lock default expiration cannot be null")
-        private Duration defaultExpiration = Duration.ofSeconds(30);
     }
 }
