@@ -51,6 +51,17 @@ services:
     ports:
       - "8080:8080"
 
+  events-consumer:
+    build:
+      context: .
+      dockerfile: events-consumer/Dockerfile
+    container_name: shortlink-events-consumer
+    env_file:
+      - dev.env
+    depends_on:
+      kafka:
+        condition: service_healthy
+
   kafka:
     image: apache/kafka:3.7.0
     container_name: shortlink-kafka
