@@ -11,12 +11,12 @@ import org.springframework.stereotype.Service;
  * 통계 조회 서비스 구현체
  *
  * <p>단축 URL의 누적 통계를 조회하는 서비스입니다.
- * Redis와 DB 데이터를 조합하여 실시간 통계 정보를 제공합니다.</p>
+ * OLAP DB에 접근하여 통계 정보를 조회합니다.</p>
  *
  * <p>주요 기능:</p>
  * <ul>
  *   <li>누적 통계 조회 (총 접속수)</li>
- *   <li>Redis 실시간 데이터와 DB 기록 데이터 조합</li>
+ *   <li>OLAP DB 기록 데이터</li>
  * </ul>
  */
 @Service
