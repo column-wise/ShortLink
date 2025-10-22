@@ -18,13 +18,13 @@ import java.time.Clock;
 /**
  * URL 해석 서비스 구현체
  *
- * <p>단축 코드를 통해 원본 URL을 찾고 방문 기록 전송(향후 Kafka)을 수행하는 서비스입니다.</p>
+ * <p>단축 코드를 통해 원본 URL을 찾고 방문 이벤트를 메시지 스트림으로 발생하는 서비스입니다.</p>
  *
  * <p>주요 기능:</p>
  * <ul>
  *   <li>단축 코드로 원본 URL 조회</li>
- *   <li>방문 시간 기반 실시간 통계 기록</li>
- *   <li>타임스탬프 기반 방문 로그 저장</li>
+ *   <li>방문 이벤트 스트림 발생</li>
+ *   <li>비동기 이벤트 처리를 통한 실시간 통계 지원</li>
  * </ul>
  */
 @Service
@@ -35,13 +35,12 @@ public class ResolveUrlService implements ResolveUrlUseCase {
     private final ShortUrlProperties properties;
     private final Clock clock;
     private final StreamPort streamPort;
-    // TODO(kafka): 방문 이벤트를 Kafka 토픽으로 발행하도록 전환 예정
-    
+
     /**
      * 단축 코드를 통해 원본 URL을 조회하고 방문을 기록합니다.
      *
      * <p>주어진 단축 코드에 해당하는 원본 URL을 데이터베이스에서 조회하고,
-     * Redis에 방문 기록을 저장합니다.</p>
+     * 방문 이벤트를 스트림으로 발행합니다.</p>
      *
      * @param code 단축 코드
      * @return 원본 URL
