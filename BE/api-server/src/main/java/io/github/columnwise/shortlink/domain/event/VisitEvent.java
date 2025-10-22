@@ -23,6 +23,8 @@ public record VisitEvent(
         Objects.requireNonNull(eventId, "eventId");
         Objects.requireNonNull(code, "code");
         Objects.requireNonNull(occurredAt, "occurredAt");
+        if (eventId.isBlank()) throw new IllegalArgumentException("eventId는 공백일 수 없습니다");
+        if (code.isBlank()) throw new IllegalArgumentException("code는 공백일 수 없습니다");
         if (uaFamily == null || uaFamily.isBlank()) uaFamily = "unknown";
         if (deviceType == null || deviceType.isBlank()) deviceType = "unknown";
     }
