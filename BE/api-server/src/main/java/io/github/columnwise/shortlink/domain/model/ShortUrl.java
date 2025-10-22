@@ -17,6 +17,7 @@ import java.time.Instant;
  *   <li>longUrl: 원본 URL (리다이렉트 대상)</li>
  *   <li>createdAt: 생성 시간</li>
  *   <li>expiresAt: 만료 시간</li>
+ *   <li>isActive: 활성화 여부</li>
  * </ul>
  *
  * @param id 데이터베이스 기본 키
@@ -27,10 +28,14 @@ import java.time.Instant;
  */
 @Builder
 public record ShortUrl(
-		long id,
+		Long id,
 		String code,
 		String longUrl,
 		Instant createdAt,
-		Instant expiresAt
+		Instant expiresAt,
+		Boolean isActive
 ) {
+    public ShortUrl {
+        isActive = (isActive != null) ? isActive : true;
+    }
 }

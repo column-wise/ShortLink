@@ -10,7 +10,6 @@ COPY gradle ./gradle
 RUN printf "rootProject.name = 'short-link'\ninclude 'shared'\ninclude 'api-server'\n" > settings.gradle
 
 # 3) 모듈의 build.gradle만 먼저 복사
-COPY shared/build.gradle ./shared/build.gradle
 COPY api-server/build.gradle ./api-server/build.gradle
 
 # 4) 의존성만 프리페치
@@ -18,7 +17,6 @@ COPY api-server/build.gradle ./api-server/build.gradle
 RUN chmod +x ./gradlew && ./gradlew :api-server:dependencies --no-daemon
 
 # 5) 소스 복사
-COPY shared/src ./shared/src
 COPY api-server/src ./api-server/src
 
 # 6) 빌드

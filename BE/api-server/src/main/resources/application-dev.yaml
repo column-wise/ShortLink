@@ -19,6 +19,19 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
 
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: 1
+      retries: 5
+      properties:
+        spring.json.add.type.headers: false
+        enable.idempotence: false
+        max.in.flight.requests.per.connection: 8
+      linger-ms: 10
+      batch-size: 32768
+      compression-type: zstd
+
 server:
   url: ${SERVER_URL:http://localhost:8080}
   port: 8080
@@ -26,4 +39,10 @@ server:
 logging:
   level:
     io.github.columnwise.shortlink: DEBUG
-    org.springframework.data.redis: INFO
+    org.springframework.data.redis: DEBUG
+    org.springframework.kafka: DEBUG
+
+app:
+  kafka:
+    topics:
+      linkHits: ${APP_KAFKA_TOPICS_LINKHITS:link_hits}

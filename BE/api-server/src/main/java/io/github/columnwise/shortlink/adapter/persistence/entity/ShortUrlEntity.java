@@ -28,6 +28,10 @@ public class ShortUrlEntity {
     
     @Column(nullable = false)
     private Instant createdAt;
-    
+
     private Instant expiresAt;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean isActive = true;
 }

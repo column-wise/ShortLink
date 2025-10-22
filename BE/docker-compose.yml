@@ -46,21 +46,50 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
     ports:
       - "8080:8080"
 
-  batch-server:
+  events-consumer:
     build:
       context: .
-      dockerfile: batch-server/Dockerfile
-    container_name: shortlink-batch
+      dockerfile: events-consumer/Dockerfile
+    container_name: shortlink-events-consumer
     env_file:
       - dev.env
     depends_on:
-      mysql:
+      kafka:
         condition: service_healthy
-      redis:
-        condition: service_healthy
+
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: shortlink-kafka
+    env_file:
+      - dev.env
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD", "/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "kafka:9092", "--list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    environment:
+      # KRaft 단일 노드 설정
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # 로컬 단일 브로커 개발 편의 설정
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_NUM_PARTITIONS: 12
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
 
 volumes:
   mysql-data:

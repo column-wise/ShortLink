@@ -44,6 +44,7 @@ public class ShortUrlRepositoryAdapter implements ShortUrlRepositoryPort {
                 .longUrl(shortUrl.longUrl())
                 .createdAt(shortUrl.createdAt())
                 .expiresAt(shortUrl.expiresAt())
+                .isActive(shortUrl.isActive())
                 .build();
                 
         ShortUrlEntity saved = shortUrlRepository.save(entity);
@@ -54,6 +55,7 @@ public class ShortUrlRepositoryAdapter implements ShortUrlRepositoryPort {
                 .longUrl(saved.getLongUrl())
                 .createdAt(saved.getCreatedAt())
                 .expiresAt(saved.getExpiresAt())
+                .isActive(saved.isActive())
                 .build();
     }
     
@@ -72,6 +74,7 @@ public class ShortUrlRepositoryAdapter implements ShortUrlRepositoryPort {
                         .longUrl(entity.getLongUrl())
                         .createdAt(entity.getCreatedAt())
                         .expiresAt(entity.getExpiresAt())
+                        .isActive(entity.isActive())
                         .build());
     }
     
@@ -91,6 +94,7 @@ public class ShortUrlRepositoryAdapter implements ShortUrlRepositoryPort {
                         .longUrl(entity.getLongUrl())
                         .createdAt(entity.getCreatedAt())
                         .expiresAt(entity.getExpiresAt())
+                        .isActive(entity.isActive())
                         .build());
     }
     

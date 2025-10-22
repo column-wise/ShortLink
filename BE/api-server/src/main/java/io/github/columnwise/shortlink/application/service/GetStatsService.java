@@ -5,32 +5,25 @@ import io.github.columnwise.shortlink.application.port.out.ShortUrlRepositoryPor
 import io.github.columnwise.shortlink.domain.exception.UrlNotFoundException;
 import io.github.columnwise.shortlink.domain.model.UrlMetrics;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
-import io.github.columnwise.shortlink.domain.service.RedisKeyManager;
-
-import java.time.Clock;
-import java.time.LocalDate;
 
 /**
  * 통계 조회 서비스 구현체
  *
  * <p>단축 URL의 누적 통계를 조회하는 서비스입니다.
- * Redis와 DB 데이터를 조합하여 실시간 통계 정보를 제공합니다.</p>
+ * OLAP DB에 접근하여 통계 정보를 조회합니다.</p>
  *
  * <p>주요 기능:</p>
  * <ul>
  *   <li>누적 통계 조회 (총 접속수)</li>
- *   <li>Redis 실시간 데이터와 DB 기록 데이터 조합</li>
+ *   <li>OLAP DB 기록 데이터</li>
  * </ul>
  */
 @Service
 @RequiredArgsConstructor
 public class GetStatsService implements GetStatsUseCase {
 
-	private final ShortUrlRepositoryPort shortUrlRepositoryPort;
-	private final RedisTemplate<String, Object> redisTemplate;
-	private final Clock clock;
+    private final ShortUrlRepositoryPort shortUrlRepositoryPort;
 
 	/**
 	 * 특정 단축 URL의 누적 통계를 조회합니다.
@@ -45,17 +38,10 @@ public class GetStatsService implements GetStatsUseCase {
 		shortUrlRepositoryPort.findByCode(code)
 				.orElseThrow(() -> new UrlNotFoundException("URL not found for code: " + code));
 
-		LocalDate today = LocalDate.now(clock);
-		String hourlyKey = RedisKeyManager.getHourlyAccessKey(code, today);
-		java.util.Map<Object, Object> entries = redisTemplate.opsForHash().entries(hourlyKey);
-		long todayCount = entries.values().stream()
-				.map(Object::toString)
-				.mapToLong(Long::parseLong)
-				.sum();
-
-		return UrlMetrics.builder()
-				.code(code)
-				.totalAccesses(todayCount)
-				.build();
-	}
+        return UrlMetrics.builder()
+                .code(code)
+                // TODO(olap): OLAP 집계 연동 전까지 0 반환
+                .totalAccesses(0)
+                .build();
+    }
 }
