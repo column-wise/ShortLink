@@ -94,7 +94,7 @@ public class GlobalExceptionHandler {
         log.warn("[400] Validation failed with {} errors", ex.getBindingResult().getErrorCount());
         Map<String, String> errors = new HashMap<>();
         ex.getBindingResult().getAllErrors().forEach((error) -> {
-            String fieldName = ((FieldError) error).getField();
+            String fieldName = (error instanceof FieldError) ? ((FieldError) error).getField() : "global";
             String errorMessage = error.getDefaultMessage();
             errors.put(fieldName, errorMessage);
         });
