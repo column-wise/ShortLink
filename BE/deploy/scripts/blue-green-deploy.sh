@@ -30,7 +30,12 @@ echo -e "${COLOR_YELLOW}[2/6] Pulling new images...${COLOR_RESET}"
 docker pull "${ECR_REGISTRY}/shortlink-api:${IMAGE_TAG}"
 docker pull "${ECR_REGISTRY}/shortlink-events-consumer:${IMAGE_TAG}"
 
-# Step 3: Check current environment
+# Step 3: Ensure Docker network exists
+echo -e "${COLOR_YELLOW}[3/6] Ensuring Docker network exists...${COLOR_RESET}"
+docker network inspect short-link_default >/dev/null 2>&1 || docker network create short-link_default
+echo -e "${COLOR_GREEN}✓ Network ready${COLOR_RESET}"
+
+# Step 4: Check current environment
 CURRENT_API_CONTAINER=$(docker ps --filter "name=shortlink-api" --filter "status=running" --format "{{.Names}}" | head -n 1)
 
 if [ -z "$CURRENT_API_CONTAINER" ]; then
@@ -41,8 +46,8 @@ else
     DEPLOY_SUFFIX="-green"
 fi
 
-# Step 4: Start new environment containers
-echo -e "${COLOR_YELLOW}[3/6] Starting new environment...${COLOR_RESET}"
+# Step 5: Start new environment containers
+echo -e "${COLOR_YELLOW}[4/6] Starting new environment...${COLOR_RESET}"
 
 docker run -d \
     --name "shortlink-api${DEPLOY_SUFFIX}" \
@@ -59,8 +64,8 @@ docker run -d \
 
 echo -e "${COLOR_GREEN}✓ New containers started${COLOR_RESET}"
 
-# Step 5: Health check
-echo -e "${COLOR_YELLOW}[4/6] Performing health check...${COLOR_RESET}"
+# Step 6: Health check
+echo -e "${COLOR_YELLOW}[5/6] Performing health check...${COLOR_RESET}"
 sleep 10
 
 for i in {1..30}; do
@@ -79,9 +84,9 @@ for i in {1..30}; do
     sleep 2
 done
 
-# Step 6: Stop old environment and rename new one
+# Step 7: Stop old environment and rename new one
 if [ ! -z "$CURRENT_API_CONTAINER" ]; then
-    echo -e "${COLOR_YELLOW}[5/6] Switching to new environment...${COLOR_RESET}"
+    echo -e "${COLOR_YELLOW}[6/7] Switching to new environment...${COLOR_RESET}"
 
     # Stop old containers
     docker stop shortlink-api shortlink-events-consumer || true
@@ -94,8 +99,8 @@ if [ ! -z "$CURRENT_API_CONTAINER" ]; then
     echo -e "${COLOR_GREEN}✓ Environment switched${COLOR_RESET}"
 fi
 
-# Step 7: Cleanup old images
-echo -e "${COLOR_YELLOW}[6/6] Cleaning up old Docker images...${COLOR_RESET}"
+# Step 8: Cleanup old images
+echo -e "${COLOR_YELLOW}[7/7] Cleaning up old Docker images...${COLOR_RESET}"
 docker image prune -f
 
 echo -e "${COLOR_GREEN}========================================${COLOR_RESET}"
