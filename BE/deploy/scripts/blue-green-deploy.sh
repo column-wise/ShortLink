@@ -31,11 +31,20 @@ docker pull "${ECR_REGISTRY}/shortlink-api:${IMAGE_TAG}"
 docker pull "${ECR_REGISTRY}/shortlink-events-consumer:${IMAGE_TAG}"
 
 # Step 3: Ensure Docker network exists
-echo -e "${COLOR_YELLOW}[3/6] Ensuring Docker network exists...${COLOR_RESET}"
+echo -e "${COLOR_YELLOW}[3/7] Ensuring Docker network exists...${COLOR_RESET}"
 docker network inspect short-link_default >/dev/null 2>&1 || docker network create short-link_default
 echo -e "${COLOR_GREEN}✓ Network ready${COLOR_RESET}"
 
-# Step 4: Check current environment
+# Step 4: Start infrastructure containers (MySQL, Redis, Kafka)
+echo -e "${COLOR_YELLOW}[4/7] Starting infrastructure containers...${COLOR_RESET}"
+docker-compose -f docker-compose.blue-green.yml up -d mysql redis kafka nginx
+
+echo -e "${COLOR_BLUE}Waiting for infrastructure services to be ready...${COLOR_RESET}"
+sleep 15
+
+echo -e "${COLOR_GREEN}✓ Infrastructure containers started${COLOR_RESET}"
+
+# Step 5: Check current environment
 CURRENT_API_CONTAINER=$(docker ps --filter "name=shortlink-api" --filter "status=running" --format "{{.Names}}" | head -n 1)
 
 if [ -z "$CURRENT_API_CONTAINER" ]; then
@@ -46,8 +55,8 @@ else
     DEPLOY_SUFFIX="-green"
 fi
 
-# Step 5: Start new environment containers
-echo -e "${COLOR_YELLOW}[4/6] Starting new environment...${COLOR_RESET}"
+# Step 6: Start new environment containers
+echo -e "${COLOR_YELLOW}[5/7] Starting new environment...${COLOR_RESET}"
 
 docker run -d \
     --name "shortlink-api${DEPLOY_SUFFIX}" \
@@ -64,8 +73,8 @@ docker run -d \
 
 echo -e "${COLOR_GREEN}✓ New containers started${COLOR_RESET}"
 
-# Step 6: Health check
-echo -e "${COLOR_YELLOW}[5/6] Performing health check...${COLOR_RESET}"
+# Step 7: Health check
+echo -e "${COLOR_YELLOW}[6/7] Performing health check...${COLOR_RESET}"
 sleep 10
 
 for i in {1..30}; do
@@ -84,9 +93,9 @@ for i in {1..30}; do
     sleep 2
 done
 
-# Step 7: Stop old environment and rename new one
+# Step 8: Stop old environment and rename new one
 if [ ! -z "$CURRENT_API_CONTAINER" ]; then
-    echo -e "${COLOR_YELLOW}[6/7] Switching to new environment...${COLOR_RESET}"
+    echo -e "${COLOR_YELLOW}[7/7] Switching to new environment...${COLOR_RESET}"
 
     # Stop old containers
     docker stop shortlink-api shortlink-events-consumer || true
@@ -99,8 +108,8 @@ if [ ! -z "$CURRENT_API_CONTAINER" ]; then
     echo -e "${COLOR_GREEN}✓ Environment switched${COLOR_RESET}"
 fi
 
-# Step 8: Cleanup old images
-echo -e "${COLOR_YELLOW}[7/7] Cleaning up old Docker images...${COLOR_RESET}"
+# Cleanup old images
+echo -e "${COLOR_YELLOW}Cleaning up old Docker images...${COLOR_RESET}"
 docker image prune -f
 
 echo -e "${COLOR_GREEN}========================================${COLOR_RESET}"
