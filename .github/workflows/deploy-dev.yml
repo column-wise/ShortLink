@@ -1,0 +1,97 @@
+name: Deploy to Dev
+
+on:
+  workflow_run:
+    workflows: ["CI - Build and Test"]
+    types:
+      - completed
+    branches: [dev]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::049759450795:role/ShortLinkDevECRPushPolicy
+          aws-region: ap-northeast-2
+
+      - name: Get EC2 instance IP from Terraform
+        id: get-ip
+        run: |
+          cd infra/dev/app
+          EC2_IP=$(terraform output -raw instance_public_ip 2>/dev/null || echo "")
+          if [ -z "$EC2_IP" ]; then
+            echo "Error: Could not get EC2 IP from Terraform output"
+            exit 1
+          fi
+          echo "ec2_ip=${EC2_IP}" >> "$GITHUB_OUTPUT"
+          echo "EC2 IP: ${EC2_IP}"
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEV_EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ steps.get-ip.outputs.ec2_ip }} >> ~/.ssh/known_hosts
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Deploy to EC2
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+          EC2_IP: ${{ steps.get-ip.outputs.ec2_ip }}
+        run: |
+          # Copy deployment files to EC2
+          scp -i ~/.ssh/deploy_key -r BE/deploy "ec2-user@${EC2_IP}:~/"
+          scp -i ~/.ssh/deploy_key BE/docker-compose.blue-green.yml "ec2-user@${EC2_IP}:~/"
+          scp -i ~/.ssh/deploy_key BE/dev.env "ec2-user@${EC2_IP}:~/"
+
+          # Execute deployment script
+          ssh -i ~/.ssh/deploy_key "ec2-user@${EC2_IP}" "ECR_REGISTRY=${ECR_REGISTRY} IMAGE_TAG=${IMAGE_TAG} bash -s" << 'ENDSSH'
+            set -e
+
+            # Make script executable
+            chmod +x ~/deploy/scripts/blue-green-deploy.sh
+
+            # Run deployment
+            cd ~
+            ./deploy/scripts/blue-green-deploy.sh
+          ENDSSH
+
+      - name: Verify deployment
+        env:
+          EC2_IP: ${{ steps.get-ip.outputs.ec2_ip }}
+        run: |
+          echo "Waiting for service to be ready..."
+          sleep 10
+
+          for i in {1..10}; do
+            if curl -f "http://${EC2_IP}/actuator/health" > /dev/null 2>&1; then
+              echo "✅ Deployment verified successfully!"
+              exit 0
+            fi
+            echo "Attempt $i/10 failed, retrying..."
+            sleep 5
+          done
+
+          echo "❌ Deployment verification failed"
+          exit 1
+
+      - name: Cleanup SSH key
+        if: always()
+        run: |
+          rm -f ~/.ssh/deploy_key
