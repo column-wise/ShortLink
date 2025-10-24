@@ -29,7 +29,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.5.0
+          terraform_version: 1.6.6
 
       - name: Get EC2 instance IP from Terraform
         id: get-ip
@@ -43,10 +43,11 @@ jobs:
             -backend-config="region=ap-northeast-2" \
             -backend-config="dynamodb_table=shortlink-terraform-lock"
 
-          # Get output from state without refreshing (no variables needed)
-          EC2_IP=$(TF_CLI_ARGS_output="-refresh=false" terraform output -raw instance_public_ip 2>/dev/null || echo "")
+          # Read EC2 IP directly from remote state to avoid config evaluation
+          # (workaround for Terraform bug: "unsupported checkable object kind 'var'")
+          EC2_IP=$(terraform state pull | jq -r '.outputs.instance_public_ip.value // empty')
           if [ -z "$EC2_IP" ]; then
-            echo "Error: Could not get EC2 IP from Terraform output"
+            echo "Error: Could not get EC2 IP from Terraform state"
             exit 1
           fi
           echo "ec2_ip=${EC2_IP}" >> "$GITHUB_OUTPUT"
