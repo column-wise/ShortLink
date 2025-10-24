@@ -1,7 +1,7 @@
-terraform {
+﻿terraform {
   required_version = ">= 1.5"
 
-  # Backend is configured via `terraform init -backend-config` flags
+  # Backend은 `terraform init -backend-config` 플래그로 설정합니다.
   backend "s3" {}
 
   required_providers {
@@ -24,7 +24,7 @@ provider "aws" {
   }
 }
 
-# Bootstrap ?�태?�서 VPC ?�보 가?�오�?
+# Bootstrap 상태에서 VPC/네트워크 및 ECR 정보 가져오기
 data "terraform_remote_state" "bootstrap" {
   backend = "s3"
 
@@ -35,7 +35,7 @@ data "terraform_remote_state" "bootstrap" {
   }
 }
 
-# EC2??Security Group
+# EC2용 Security Group
 module "app_sg" {
   source = "../../modules/security-group"
 
@@ -49,7 +49,7 @@ module "app_sg" {
       from_port   = 22
       to_port     = 22
       protocol    = "tcp"
-      cidr_blocks = "0.0.0.0/0"  # TODO: GitHub Actions IP�??�한 권장
+      cidr_blocks = "0.0.0.0/0"  # TODO: GitHub Actions IP로 제한 권장
       description = "SSH from anywhere"
     },
     {
@@ -84,7 +84,7 @@ module "app_sg" {
   }]
 }
 
-# IAM Role for EC2 (ECR ?�근??
+# EC2용 IAM Role (ECR 접근 권한)
 resource "aws_iam_role" "ec2_role" {
   name = "shortlink-dev-ec2-role"
 
@@ -100,7 +100,7 @@ resource "aws_iam_role" "ec2_role" {
   })
 }
 
-# IAM Policy Attachment - ECR ?�기 권한
+# IAM Policy Attachment - ECR 읽기 권한
 resource "aws_iam_role_policy_attachment" "ecr_read_only" {
   role       = aws_iam_role.ec2_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
@@ -118,10 +118,10 @@ resource "aws_iam_instance_profile" "ec2_profile" {
   role = aws_iam_role.ec2_role.name
 }
 
-# EC2 Key Pair (기존 ???�용 ?�는 ?�로 ?�성)
+# EC2 키 페어 (기존 키 사용 시 생략 가능)
 resource "aws_key_pair" "dev" {
   key_name   = "shortlink-dev-key"
-  public_key = var.ssh_public_key  # terraform.tfvars???�의
+  public_key = var.ssh_public_key  # terraform.tfvars에서 입력
 }
 
 # User Data Script

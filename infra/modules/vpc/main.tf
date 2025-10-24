@@ -1,4 +1,4 @@
-data "aws_availability_zones" "available" {
+﻿data "aws_availability_zones" "available" {
   state = "available"
 }
 
@@ -67,7 +67,7 @@ resource "aws_eip" "nat" {
   depends_on = [aws_internet_gateway.main]
 }
 
-# NAT Gateway (Public Subnet 1개에만)
+# NAT Gateway (Public Subnet 1媛쒖뿉留?
 resource "aws_nat_gateway" "main" {
   allocation_id = aws_eip.nat.id
   subnet_id     = aws_subnet.public[0].id
@@ -130,7 +130,7 @@ resource "aws_route_table_association" "private" {
 resource "aws_default_security_group" "default" {
   vpc_id = aws_vpc.main.id
 
-  # 같은 VPC 내에서만 통신 허용
+  # 媛숈? VPC ?댁뿉?쒕쭔 ?듭떊 ?덉슜
   ingress {
     from_port = 0
     to_port   = 0
@@ -150,3 +150,4 @@ resource "aws_default_security_group" "default" {
     Environment = var.environment
   }
 }
+

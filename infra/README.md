@@ -1,335 +1,117 @@
-# ShortLink Infrastructure as Code
+﻿# ShortLink Infrastructure as Code
 
-Terraform?�로 관리하??ShortLink ?�로?�트 ?�프??
-## ?�� 구조
+Terraform로 AWS 개발 환경을 코드로 관리합니다.
+
+## 디렉터리 구조
 
 ```
 infra/
-?��??� dev/                  # 개발 ?�경
-??  ?��??� bootstrap/        # 기반 ?�프??(S3, VPC, ECR)
-??  ?��??� app/              # ?�플리�??�션 ?�프??(EC2)
-???��??� prod/                 # ?�로?�션 ?�경
-??  ?��??� bootstrap/
-??  ?��??� app/
-???��??� modules/              # ?�사??가?�한 모듈
-    ?��??� vpc/
-    ?��??� ec2/
-    ?��??� security-group/
-    ?��??� ecr/
-    ?��??� rds/
-    ?��??� elasticache/
-    ?��??� alb/
+└── dev/                  # 개발 환경
+    ├── bootstrap/        # 기반 인프라(S3, VPC, ECR)
+    └── app/              # 애플리케이션 인프라(EC2)
+└── modules/              # 재사용 가능한 모듈
+    ├── vpc/
+    ├── ec2/
+    └── security-group/
 ```
 
-## ?? ?�작?�기
+## 시작하기
 
-### ?�전 준�?
-1. **AWS CLI ?�치 �??�정**
+### 사전 준비
+1. AWS CLI 설치 및 설정
 ```bash
-# AWS CLI ?�치 (macOS)
 brew install awscli
-
-# AWS ?�격 증명 ?�정
 aws configure
-# AWS Access Key ID: [your-access-key]
-# AWS Secret Access Key: [your-secret-key]
 # Default region name: ap-northeast-2
-# Default output format: json
-
-# 계정 ID ?�인
-aws sts get-caller-identity --query Account --output text
 ```
 
-2. **Terraform ?�치**
+2. Terraform 설치 (1.5 이상 권장)
 ```bash
-# macOS
 brew install terraform
-
-# 버전 ?�인 (1.5 ?�상 ?�요)
 terraform version
 ```
 
-3. **SSH ???�성**
+3. SSH 키 생성 (EC2 접속용)
 ```bash
-# EC2 ?�속??SSH ???�성
 ssh-keygen -t rsa -b 4096 -f ~/.ssh/shortlink-dev-key
-
-# 공개???�인 (??값을 terraform.tfvars???�력)
 cat ~/.ssh/shortlink-dev-key.pub
 ```
 
 ---
 
-## ?�� 배포 ?�서
+## 배포 절차
 
-### Step 1: Bootstrap ?�프??배포
-
-Bootstrap?� **??번만 ?�행**?�여 기반 ?�프?��? ?�성?�니??
-
+### 1) Bootstrap 스택 배포 (S3, DynamoDB, VPC, ECR)
 ```bash
 cd infra/dev/bootstrap
 
-# 1. terraform.tfvars ?�정
-# - aws_account_id: ?�제 AWS 계정 ID
-vi terraform.tfvars
+# 원격 상태 백엔드 초기화 (예시)
+terraform init \
+  -backend-config="bucket=<STATE_BUCKET_NAME>" \
+  -backend-config="key=dev/bootstrap/terraform.tfstate" \
+  -backend-config="region=ap-northeast-2" \
+  -backend-config="dynamodb_table=shortlink-terraform-lock"
 
-# 2. Terraform 초기??terraform init -backend-config="bucket=<STATE_BUCKET_NAME>" -backend-config="key=dev/bootstrap/terraform.tfstate" -backend-config="region=ap-northeast-2" -backend-config="dynamodb_table=shortlink-terraform-lock"`r`n
-# 3. ?�행 계획 ?�인
 terraform plan
-
-# 4. ?�프???�성
 terraform apply
-
-# 5. Output ?�인
 terraform output
 ```
 
-**?�성?�는 리소??**
-- S3 버킷 (Terraform ?�태 ?�??
-- DynamoDB ?�이�?(?�태 ??
-- VPC, ?�브?? Internet Gateway, NAT Gateway
-- ECR 리포지?�리 (API, Events Consumer)
+생성 리소스
+- S3 버킷 (Terraform 상태)
+- DynamoDB 테이블 (상태 락)
+- VPC, 서브넷, IGW, NAT Gateway
+- ECR 리포지토리 (api, events-consumer)
 
-**중요:** Bootstrap apply ??출력?�는 S3 버킷명을 복사?�서 `dev/app/main.tf`??backend ?�정???�력?�세??
+중요: 출력된 S3 버킷명을 infra/dev/app에서 사용합니다.
 
 ---
 
-### Step 2: Application ?�프??배포
-
+### 2) App 스택 배포 (EC2)
 ```bash
-cd infra/dev/app
+cd ../app
 
-# 1. terraform.tfvars ?�정
-# - ssh_public_key: cat ~/.ssh/shortlink-dev-key.pub ??출력�?vi terraform.tfvars
+# 입력 변수
+# - var.state_bucket_name: Bootstrap에서 만든 상태 버킷명
+# - var.ssh_public_key: ~/.ssh/shortlink-dev-key.pub 내용
 
-# 2. main.tf??backend ?�정 ?�정
-# - bucket: bootstrap output??s3_bucket_name �?vi main.tf
-
-# 3. Terraform 초기??(S3 백엔???�용)
-terraform init -backend-config="bucket=<STATE_BUCKET_NAME>" -backend-config="key=dev/bootstrap/terraform.tfstate" -backend-config="region=ap-northeast-2" -backend-config="dynamodb_table=shortlink-terraform-lock"`r`n
-# 4. ?�행 계획 ?�인
+terraform init
 terraform plan
-
-# 5. ?�프???�성
 terraform apply
 
-# 6. Output ?�인 (Public IP ?�인)
-terraform output
+terraform output  # public IP, SSH 명령 확인
 ```
 
-**?�성?�는 리소??**
-- EC2 ?�스?�스 (t2.micro)
-- Security Group (SSH, HTTP, HTTPS)
-- IAM Role (ECR ?�근 권한)
+생성 리소스
+- EC2 인스턴스 (t2.micro)
+- Security Group (22, 80, 443, 8080)
+- IAM Role/Instance Profile (ECR, CloudWatch Logs 권한)
 - Key Pair
 
 ---
 
-## ?���?EC2 ?�속 �??�플리�??�션 배포
-
-### 1. SSH ?�속
-
+## EC2 접속 및 애플리케이션 배포 (예시)
 ```bash
-# Public IP ?�인
-cd infra/dev/app
-terraform output instance_public_ip
+# Public IP 확인
+cd infra/dev/app && terraform output -raw instance_public_ip
 
-# SSH ?�속
+# SSH 접속
 ssh -i ~/.ssh/shortlink-dev-key ec2-user@<PUBLIC_IP>
-```
 
-### 2. ?�플리�??�션 배포
-
-```bash
-# EC2 ?�버 ?��??�서 ?�행
-
-# 1. ?�로?�트 ?�론
-cd /opt/shortlink
-git clone <YOUR_REPOSITORY_URL>
-cd short-link/BE
-
-# 2. ECR 로그??/usr/local/bin/ecr-login.sh
-
-# 3. ?�경 변???�일 ?�성
-cp /opt/shortlink/.env.template .env
-
-# 4. Docker Compose�??�체 ?�택 ?�행
-docker-compose up -d
-
-# 5. 로그 ?�인
-docker-compose logs -f api-server
-```
-
-### 3. ?�스체크
-
-```bash
-# 로컬?�서 ?�행
-PUBLIC_IP=$(cd infra/dev/app && terraform output -raw instance_public_ip)
-
-curl http://$PUBLIC_IP:8080/actuator/health
-# ?�답: {"status":"UP"}
+# (선택) 서버에서 저장소 클론
+# git clone <YOUR_REPOSITORY_URL>
 ```
 
 ---
 
-## ?�� 주요 명령??
-### Terraform
-
+## 주요 명령어
 ```bash
-# 변�??�항 ?�인
 terraform plan
-
-# ?�프???�용
 terraform apply
-
-# ?�정 리소?�만 ?�용
-terraform apply -target=module.app_server
-
-# 리소????��
-terraform destroy
-
-# Output ?�인
-terraform output
-
-# ?�태 ?�인
-terraform state list
-terraform state show <RESOURCE>
-```
-
-### AWS CLI
-
-```bash
-# ECR 리포지?�리 목록
-aws ecr describe-repositories
-
-# ECR ?��?지 목록
-aws ecr list-images --repository-name shortlink-api
-
-# EC2 ?�스?�스 목록
-aws ec2 describe-instances --filters "Name=tag:Project,Values=shortlink"
-
-# VPC 목록
-aws ec2 describe-vpcs --filters "Name=tag:Project,Values=shortlink"
-```
-
----
-
-## ?���?리소????��
-
-**주의:** ??�� ?�서�?지켜야 ?�니??
-
-```bash
-# 1. App ?�프????��
-cd infra/dev/app
-terraform destroy
-
-# 2. Bootstrap ?�프????��
-cd ../bootstrap
 terraform destroy
 ```
 
-**참고:** S3 버킷�?DynamoDB ?�이블�? `prevent_destroy = true`�?보호?�어 ?�습?�다. ??��?�려�?main.tf?�서 ?�당 ?�정???�거?�야 ?�니??
-
----
-
-## ?�� 비용 ?�상
-
-### \xC9\xB4\xEC\xA0\x95 \xEC\x84\xA4\xEC\xA0\x95 (ap-northeast-2)
-
-| 리소??| ?�양 | ??비용 |
-|--------|------|---------|
-| EC2 | t2.micro (750?�간 Free Tier) | **$0** |
-| EBS | 30GB gp3 | $2.40 |
-| NAT Gateway | 1�?| $32.40 |
-| Data Transfer | 100GB ?�내 | **$0** |
-| S3 | Terraform ?�태 (< 1GB) | $0.02 |
-| **총계** | | **~$35/??* |
-
-**비용 ?�감 ??**
-- ?�용?��? ?�을 ??EC2 중�?: `aws ec2 stop-instances --instance-ids <INSTANCE_ID>`
-- NAT Gateway ?�거 (Public Subnet�??�용): $32 ?�감
-- ?�무 ?�간�??�행 (??�?9-18??: ~70% ?�감
-
----
-
-## ?�� 보안 권장?�항
-
-### 1. SSH ?�근 ?�한
-
-```hcl
-# infra/dev/app/main.tf ?�정
-ingress_rules = [
-  {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = "YOUR_IP/32"  # ?�정 IP�??�용
-    description = "SSH from my IP"
-  }
-]
-```
-
-### 2. Secrets 관�?
-```bash
-# terraform.tfvars�?.gitignore??추�? (?��? 추�???
-# 민감 ?�보??AWS Secrets Manager ?�용 권장
-```
-
-### 3. IAM 권한 최소??
-```bash
-# EC2 IAM Role???�요??최소 권한�?부??# ?�재: ECR Read + CloudWatch Logs
-```
-
----
-
-## ?�� 문제 ?�결
-
-### 1. "Error: No valid credential sources found"
-
-```bash
-# AWS CLI ?�설??aws configure
-
-# ?�격 증명 ?�인
-aws sts get-caller-identity
-```
-
-### 2. "Error: error configuring S3 Backend: no valid credential sources for S3 Backend found"
-
-```bash
-# Bootstrap??먼�? apply ?�는지 ?�인
-cd infra/dev/bootstrap
-terraform apply
-
-# S3 버킷명을 dev/app/main.tf???�확???�력?�는지 ?�인
-```
-
-### 3. SSH ?�속 ????
-```bash
-# Security Group ?�인
-aws ec2 describe-security-groups --group-ids <SG_ID>
-
-# SSH ??권한 ?�인
-chmod 600 ~/.ssh/shortlink-dev-key
-
-# EC2 ?�태 ?�인
-aws ec2 describe-instances --instance-ids <INSTANCE_ID>
-```
-
----
-
-## ?�� ?�음 ?�계
-
-- [ ] Week 3-4: RDS, ElastiCache 추�?
-- [ ] Week 3-4: ALB + Auto Scaling Group
-- [ ] Week 3-4: GitHub Actions CI/CD ?�동
-- [ ] Week 5-6: EKS ?�러?�터 구축
-- [ ] Week 7-8: 무중??배포 ?�이?�라??
----
-
-## ?�� 참고 ?�료
-
-- [Terraform AWS Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
-- [AWS Free Tier](https://aws.amazon.com/free/)
-- [Terraform Best Practices](https://www.terraform-best-practices.com/)
-
-
+## 보안/운영 팁
+- SSH 접근은 고정 IP(예: GitHub Actions)로 제한 권장
+- terraform.tfvars는 .gitignore에 포함하고 비밀은 Secrets Manager 사용 권장
+- IAM 권한은 최소 권한 원칙 준수 (현재: ECR Read, CloudWatch Logs)

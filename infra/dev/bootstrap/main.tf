@@ -1,7 +1,7 @@
-terraform {
+﻿terraform {
   required_version = ">= 1.5"
 
-  # Bootstrap state를 S3에 저장
+  # Bootstrap 상태 저장을 위한 S3 백엔드
   backend "s3" {
     bucket         = "shortlink-terraform-state-049759450795"
     key            = "dev/bootstrap/terraform.tfstate"
@@ -35,11 +35,11 @@ resource "aws_s3_bucket" "terraform_state" {
   bucket = "shortlink-terraform-state-${var.aws_account_id}"
 
   lifecycle {
-    prevent_destroy = true  # 실수로 삭제 방지
+    prevent_destroy = true  # 실수 삭제 방지
   }
 }
 
-# S3 버킷 버저닝 활성화
+# S3 버킷 버전 관리
 resource "aws_s3_bucket_versioning" "terraform_state" {
   bucket = aws_s3_bucket.terraform_state.id
 
@@ -48,7 +48,7 @@ resource "aws_s3_bucket_versioning" "terraform_state" {
   }
 }
 
-# S3 버킷 암호화
+# S3 버킷 서버측 암호화
 resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state" {
   bucket = aws_s3_bucket.terraform_state.id
 
@@ -69,7 +69,7 @@ resource "aws_s3_bucket_public_access_block" "terraform_state" {
   restrict_public_buckets = true
 }
 
-# DynamoDB 테이블 - Terraform 상태 락
+# DynamoDB 테이블 - Terraform 상태 잠금
 resource "aws_dynamodb_table" "terraform_lock" {
   name         = "shortlink-terraform-lock"
   billing_mode = "PAY_PER_REQUEST"
@@ -120,7 +120,7 @@ resource "aws_ecr_repository" "events_consumer" {
   }
 }
 
-# ECR Lifecycle Policy - 오래된 이미지 자동 삭제
+# ECR Lifecycle Policy - 오래된 이미지 자동 정리
 resource "aws_ecr_lifecycle_policy" "api_server" {
   repository = aws_ecr_repository.api_server.name
 
@@ -129,9 +129,9 @@ resource "aws_ecr_lifecycle_policy" "api_server" {
       rulePriority = 1
       description  = "Keep last 10 images"
       selection = {
-        tagStatus     = "any"
-        countType     = "imageCountMoreThan"
-        countNumber   = 10
+        tagStatus   = "any"
+        countType   = "imageCountMoreThan"
+        countNumber = 10
       }
       action = {
         type = "expire"
@@ -148,9 +148,9 @@ resource "aws_ecr_lifecycle_policy" "events_consumer" {
       rulePriority = 1
       description  = "Keep last 10 images"
       selection = {
-        tagStatus     = "any"
-        countType     = "imageCountMoreThan"
-        countNumber   = 10
+        tagStatus   = "any"
+        countType   = "imageCountMoreThan"
+        countNumber = 10
       }
       action = {
         type = "expire"
