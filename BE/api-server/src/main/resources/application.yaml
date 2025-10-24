@@ -10,3 +10,12 @@ spring:
 
 server:
   url: ${SERVER_URL:http://localhost:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: when-authorized
