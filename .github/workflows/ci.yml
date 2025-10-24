@@ -84,9 +84,9 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: shortlink-api
           IMAGE_TAG: ${{ github.sha }}
-        working-directory: ./BE/api-server
+        working-directory: ./BE
         run: |
-          docker build -t "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}" .
+          docker build -f api-server/Dockerfile -t "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}" .
           docker tag "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}" "${ECR_REGISTRY}/${ECR_REPOSITORY}:latest"
           docker push "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
           docker push "${ECR_REGISTRY}/${ECR_REPOSITORY}:latest"
@@ -96,9 +96,9 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: shortlink-events-consumer
           IMAGE_TAG: ${{ github.sha }}
-        working-directory: ./BE/events-consumer
+        working-directory: ./BE
         run: |
-          docker build -t "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}" .
+          docker build -f events-consumer/Dockerfile -t "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}" .
           docker tag "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}" "${ECR_REGISTRY}/${ECR_REPOSITORY}:latest"
           docker push "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
           docker push "${ECR_REGISTRY}/${ECR_REPOSITORY}:latest"
