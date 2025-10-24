@@ -14,3 +14,8 @@ variable "ssh_public_key" {
   description = "SSH public key for EC2 access"
   type        = string
 }
+
+variable "state_bucket_name" {
+  description = "Name of the S3 bucket storing Terraform remote state (from bootstrap output)"
+  type        = string
+}
