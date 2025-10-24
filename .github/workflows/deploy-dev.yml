@@ -43,7 +43,8 @@ jobs:
             -backend-config="region=ap-northeast-2" \
             -backend-config="dynamodb_table=shortlink-terraform-lock"
 
-          EC2_IP=$(terraform output -raw instance_public_ip 2>/dev/null || echo "")
+          # Get output from state without refreshing (no variables needed)
+          EC2_IP=$(TF_CLI_ARGS_output="-refresh=false" terraform output -raw instance_public_ip 2>/dev/null || echo "")
           if [ -z "$EC2_IP" ]; then
             echo "Error: Could not get EC2 IP from Terraform output"
             exit 1
