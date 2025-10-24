@@ -43,12 +43,12 @@ jobs:
             -backend-config="region=ap-northeast-2" \
             -backend-config="dynamodb_table=shortlink-terraform-lock"
 
-          # Derive public key from the private key secret for EC2 key pair
-          TMP_KEY=$(mktemp)
-          printf "%s" "${{ secrets.DEV_EC2_SSH_KEY }}" > "$TMP_KEY"
-          chmod 600 "$TMP_KEY"
-          PUB_KEY=$(ssh-keygen -y -f "$TMP_KEY")
-          rm -f "$TMP_KEY"
+          # Use public key from secrets to avoid deriving in CI
+          PUB_KEY="${{ secrets.DEV_EC2_SSH_PUBLIC_KEY }}"
+          if [ -z "$PUB_KEY" ]; then
+            echo "Error: DEV_EC2_SSH_PUBLIC_KEY secret is not set."
+            exit 1
+          fi
 
           # Apply to ensure EC2 exists and is running
           terraform apply -auto-approve \
