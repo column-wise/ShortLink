@@ -31,6 +31,30 @@ jobs:
         with:
           terraform_version: 1.6.6
 
+      - name: Provision Dev EC2
+        run: |
+          set -e
+          cd infra/dev/app
+
+          # Initialize Terraform with S3 backend
+          terraform init \
+            -backend-config="bucket=shortlink-terraform-state-049759450795" \
+            -backend-config="key=dev/app/terraform.tfstate" \
+            -backend-config="region=ap-northeast-2" \
+            -backend-config="dynamodb_table=shortlink-terraform-lock"
+
+          # Derive public key from the private key secret for EC2 key pair
+          TMP_KEY=$(mktemp)
+          printf "%s" "${{ secrets.DEV_EC2_SSH_KEY }}" > "$TMP_KEY"
+          chmod 600 "$TMP_KEY"
+          PUB_KEY=$(ssh-keygen -y -f "$TMP_KEY")
+          rm -f "$TMP_KEY"
+
+          # Apply to ensure EC2 exists and is running
+          terraform apply -auto-approve \
+            -var "ssh_public_key=${PUB_KEY}" \
+            -var "state_bucket_name=shortlink-terraform-state-049759450795"
+
       - name: Get EC2 instance IP from Terraform
         id: get-ip
         run: |
