@@ -106,3 +106,8 @@ services:
 
 volumes:
   mysql-data:
+
+networks:
+  default:
+    name: short-link_default
+    external: true
