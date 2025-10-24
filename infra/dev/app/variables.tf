@@ -7,7 +7,7 @@ variable "aws_region" {
 variable "instance_type" {
   description = "EC2 instance type"
   type        = string
-  default     = "t2.micro"  # Free Tier
+  default     = "t3.large"  # Upgrade for dev server
 }
 
 variable "ssh_public_key" {
