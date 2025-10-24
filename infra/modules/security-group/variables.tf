@@ -35,9 +35,9 @@ variable "ingress_rules" {
     condition = alltrue([
       for rule in var.ingress_rules :
       (
-        try(trim(rule.cidr_blocks) != "", false)
+        rule.cidr_blocks != null && rule.cidr_blocks != ""
       ) || (
-        try(rule.source_security_group_id != null, false)
+        rule.source_security_group_id != null && rule.source_security_group_id != ""
       )
     ])
     error_message = "Each ingress rule must provide either a non-empty cidr_blocks or a source_security_group_id."
