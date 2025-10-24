@@ -30,6 +30,18 @@ variable "ingress_rules" {
     description              = optional(string)
   }))
   default = []
+
+  validation {
+    condition = alltrue([
+      for rule in var.ingress_rules :
+      (
+        try(trim(rule.cidr_blocks) != "", false)
+      ) || (
+        try(rule.source_security_group_id != null, false)
+      )
+    ])
+    error_message = "Each ingress rule must provide either a non-empty cidr_blocks or a source_security_group_id."
+  }
 }
 
 variable "egress_rules" {
