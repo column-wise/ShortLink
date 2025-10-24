@@ -71,7 +71,7 @@ jobs:
           # Copy deployment files to EC2
           scp -i ~/.ssh/deploy_key -r BE/deploy "ec2-user@${EC2_IP}:~/"
           scp -i ~/.ssh/deploy_key BE/docker-compose.blue-green.yml "ec2-user@${EC2_IP}:~/"
-          scp -i ~/.ssh/deploy_key BE/dev.env "ec2-user@${EC2_IP}:~/"
+          # Note: dev.env is already on EC2 (not in git repo)
 
           # Execute deployment script
           ssh -i ~/.ssh/deploy_key "ec2-user@${EC2_IP}" "ECR_REGISTRY=${ECR_REGISTRY} IMAGE_TAG=${IMAGE_TAG} bash -s" << 'ENDSSH'
