@@ -31,46 +31,16 @@ jobs:
         with:
           terraform_version: 1.6.6
 
-      - name: Provision Dev EC2
+      - name: Download Terraform state
         run: |
-          set -e
-          cd infra/dev/app
+          aws s3 cp s3://shortlink-terraform-state-049759450795/dev/app/terraform.tfstate ./terraform.tfstate
 
-          # Initialize Terraform with S3 backend
-          terraform init \
-            -backend-config="bucket=shortlink-terraform-state-049759450795" \
-            -backend-config="key=dev/app/terraform.tfstate" \
-            -backend-config="region=ap-northeast-2" \
-            -backend-config="dynamodb_table=shortlink-terraform-lock"
-
-          # Use public key from secrets to avoid deriving in CI
-          PUB_KEY="${{ secrets.DEV_EC2_SSH_PUBLIC_KEY }}"
-          if [ -z "$PUB_KEY" ]; then
-            echo "Error: DEV_EC2_SSH_PUBLIC_KEY secret is not set."
-            exit 1
-          fi
-
-          # Apply to ensure EC2 exists and is running
-          terraform apply -auto-approve \
-            -var "ssh_public_key=${PUB_KEY}" \
-            -var "state_bucket_name=shortlink-terraform-state-049759450795"
-
-      - name: Get EC2 instance IP from Terraform
+      - name: Get EC2 instance IP from local state
         id: get-ip
         run: |
-          cd infra/dev/app
-
-          # Initialize Terraform with S3 backend
-          terraform init \
-            -backend-config="bucket=shortlink-terraform-state-049759450795" \
-            -backend-config="key=dev/app/terraform.tfstate" \
-            -backend-config="region=ap-northeast-2" \
-            -backend-config="dynamodb_table=shortlink-terraform-lock"
-
-          # Get output from (refreshed) state with Terraform 1.6+
-          EC2_IP=$(terraform output -raw instance_public_ip 2>/dev/null || echo "")
+          EC2_IP=$(terraform output -state=./terraform.tfstate -raw instance_public_ip 2>/dev/null || echo "")
           if [ -z "$EC2_IP" ]; then
-            echo "Error: Could not get EC2 IP from Terraform output"
+            echo "Error: Could not get EC2 IP from local Terraform state"
             exit 1
           fi
           echo "ec2_ip=${EC2_IP}" >> "$GITHUB_OUTPUT"
