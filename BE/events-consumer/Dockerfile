@@ -26,5 +26,13 @@ FROM eclipse-temurin:21-jre-alpine
 ENV SPRING_PROFILES_ACTIVE=dev
 WORKDIR /app
 COPY --from=build /workspace/events-consumer/build/libs/*.jar app.jar
-ENTRYPOINT ["java","-jar","app.jar"]
 
+# Ensure log directory exists and write app logs there for health probes
+RUN mkdir -p /app/logs
+
+# Docker healthcheck without exposing HTTP: mark healthy once app has started
+# This checks for the Spring Boot startup message in the log file
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=12 \
+  CMD sh -c "grep -q 'Started EventsConsumerApplication' /app/logs/spring.log || exit 1"
+
+ENTRYPOINT ["java","-Dlogging.file.path=/app/logs","-jar","app.jar"]
