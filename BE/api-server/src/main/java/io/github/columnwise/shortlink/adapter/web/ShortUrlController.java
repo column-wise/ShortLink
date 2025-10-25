@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
+import org.springframework.beans.factory.annotation.Autowired;
 
 
 /**
@@ -60,6 +61,9 @@ public class ShortUrlController {
 	@Value("${server.url}")
 	private String serverUrl;
 
+	@Autowired
+	private HttpServletRequest httpRequest;
+
 	@PostMapping("/urls")
 	@Operation(
 		summary = "URL 단축",
@@ -82,9 +86,26 @@ public class ShortUrlController {
 	) {
 		ShortUrl shortUrl = createShortUrlUseCase.createShortUrl(request.longUrl());
 
+
+		String scheme = httpRequest.getHeader("X-Forwarded-Proto");
+		if (scheme == null || scheme.isBlank()) {
+			scheme = httpRequest.getScheme();
+		}
+
+		String host = httpRequest.getHeader("Host");
+		if (host == null || host.isBlank()) {
+			String serverName = httpRequest.getServerName();
+			int port = httpRequest.getServerPort();
+			boolean defaultPort = ("http".equalsIgnoreCase(scheme) && port == 80)
+					|| ("https".equalsIgnoreCase(scheme) && port == 443);
+			host = defaultPort ? serverName : serverName + ":" + port;
+		}
+
+		String baseUrl = scheme + "://" + host;
+
 		CreateShortUrlResponse response = new CreateShortUrlResponse(
 				shortUrl.code(),
-				serverUrl + "/api/v1/r/" + shortUrl.code()
+				baseUrl + "/api/v1/r/" + shortUrl.code()
 		);
 
 		return ResponseEntity.status(HttpStatus.CREATED).body(response);
