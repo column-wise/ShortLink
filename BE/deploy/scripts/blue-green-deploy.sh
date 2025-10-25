@@ -22,13 +22,15 @@ echo "Image Tag: ${IMAGE_TAG}"
 echo ""
 
 # Step 1: ECR Login
-echo -e "${COLOR_YELLOW}[1/6] Logging in to ECR...${COLOR_RESET}"
+echo -e "${COLOR_YELLOW}[1/7] Logging in to ECR...${COLOR_RESET}"
 aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin "${ECR_REGISTRY}"
 
 # Step 2: Pull new images
-echo -e "${COLOR_YELLOW}[2/6] Pulling new images...${COLOR_RESET}"
+echo -e "${COLOR_YELLOW}[2/7] Pulling new images...${COLOR_RESET}"
 docker pull "${ECR_REGISTRY}/shortlink-api:${IMAGE_TAG}"
 docker pull "${ECR_REGISTRY}/shortlink-events-consumer:${IMAGE_TAG}"
+# Curl image for in-network health checks
+docker pull curlimages/curl:8.10.1
 
 # Step 3: Ensure Docker network exists
 echo -e "${COLOR_YELLOW}[3/7] Ensuring Docker network exists...${COLOR_RESET}"
@@ -62,7 +64,6 @@ docker run -d \
     --name "shortlink-api${DEPLOY_SUFFIX}" \
     --network short-link_default \
     --env-file dev.env \
-    -p 8080:8080 \
     "${ECR_REGISTRY}/shortlink-api:${IMAGE_TAG}"
 
 docker run -d \
@@ -73,12 +74,14 @@ docker run -d \
 
 echo -e "${COLOR_GREEN}✓ New containers started${COLOR_RESET}"
 
-# Step 7: Health check
-echo -e "${COLOR_YELLOW}[6/7] Performing health check...${COLOR_RESET}"
+# Step 7: Health check (API + Events Consumer)
+echo -e "${COLOR_YELLOW}[6/7] Performing health checks...${COLOR_RESET}"
 sleep 10
 
+# Target the new environment directly over the Docker network
+TARGET_NAME="shortlink-api${DEPLOY_SUFFIX}"
 for i in {1..30}; do
-    if curl -f http://localhost:8080/actuator/health > /dev/null 2>&1; then
+    if docker run --rm --network short-link_default curlimages/curl:8.10.1 -fsS "http://${TARGET_NAME}:8080/actuator/health" > /dev/null 2>&1; then
         echo -e "${COLOR_GREEN}✓ Health check passed!${COLOR_RESET}"
         break
     fi
@@ -90,6 +93,27 @@ for i in {1..30}; do
         exit 1
     fi
     echo "Waiting for health check... ($i/30)"
+    sleep 2
+done
+
+# Events Consumer readiness via Docker health status
+CONSUMER_NAME="shortlink-events-consumer${DEPLOY_SUFFIX}"
+for i in {1..30}; do
+    if docker ps --format '{{.Names}}' | grep -q "^${CONSUMER_NAME}$"; then
+        STATUS=$(docker inspect -f '{{.State.Health.Status}}' "${CONSUMER_NAME}" 2>/dev/null || echo "unknown")
+        if [ "${STATUS}" = "healthy" ]; then
+            echo -e "${COLOR_GREEN}✓ Events consumer healthy${COLOR_RESET}"
+            break
+        fi
+    fi
+    if [ $i -eq 30 ]; then
+        echo -e "${COLOR_RED}✗ Events consumer failed to become healthy${COLOR_RESET}"
+        echo "Rolling back..."
+        docker stop "shortlink-api${DEPLOY_SUFFIX}" "shortlink-events-consumer${DEPLOY_SUFFIX}" || true
+        docker rm "shortlink-api${DEPLOY_SUFFIX}" "shortlink-events-consumer${DEPLOY_SUFFIX}" || true
+        exit 1
+    fi
+    echo "Waiting for events consumer health... ($i/30)"
     sleep 2
 done
 
@@ -106,6 +130,13 @@ if [ ! -z "$CURRENT_API_CONTAINER" ]; then
     docker rename shortlink-events-consumer-green shortlink-events-consumer || true
 
     echo -e "${COLOR_GREEN}✓ Environment switched${COLOR_RESET}"
+fi
+
+# Reload Nginx to re-resolve upstream target
+if docker ps --format '{{.Names}}' | grep -q '^shortlink-nginx$'; then
+    echo -e "${COLOR_YELLOW}Reloading Nginx...${COLOR_RESET}"
+    docker exec shortlink-nginx nginx -s reload || docker restart shortlink-nginx || true
+    echo -e "${COLOR_GREEN}✓ Nginx reloaded${COLOR_RESET}"
 fi
 
 # Cleanup old images
