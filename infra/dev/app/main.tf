@@ -6,7 +6,6 @@
     key            = "dev/app/terraform.tfstate"
     region         = "ap-northeast-2"
     encrypt        = true
-    dynamodb_table = "shortlink-terraform-lock"
   }
 
   required_providers {
