@@ -41,7 +41,7 @@ cat ~/.ssh/shortlink-dev-key.pub
 
 ## 배포 절차
 
-### 1) Bootstrap 스택 배포 (S3, DynamoDB, VPC, ECR)
+### 1) Bootstrap 스택 배포 (S3, VPC, ECR)
 ```bash
 cd infra/dev/bootstrap
 
@@ -50,7 +50,7 @@ terraform init \
   -backend-config="bucket=<STATE_BUCKET_NAME>" \
   -backend-config="key=dev/bootstrap/terraform.tfstate" \
   -backend-config="region=ap-northeast-2" \
-  -backend-config="dynamodb_table=shortlink-terraform-lock"
+  # DynamoDB 상태 락은 사용하지 않습니다.
 
 terraform plan
 terraform apply
@@ -59,7 +59,6 @@ terraform output
 
 생성 리소스
 - S3 버킷 (Terraform 상태)
-- DynamoDB 테이블 (상태 락)
 - VPC, 서브넷, IGW, NAT Gateway
 - ECR 리포지토리 (api, events-consumer)
 
